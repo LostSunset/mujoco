@@ -538,7 +538,10 @@ static constexpr char xml_child[] = R"(
           </body>
         </frame>
       </frame>
-      <body name="ignore"/>
+      <body name="ignore">
+        <geom size=".1"/>
+        <joint type="slide"/>
+      </body>
       <frame name="frame" pos=".1 0 0" euler="0 90 0"/>
     </worldbody>
 
@@ -563,8 +566,8 @@ static constexpr char xml_child[] = R"(
     </contact>
 
     <keyframe>
-      <key name="two" time="2" qpos="2" act="2 2" ctrl="2 2"/>
-      <key name="three" time="3" qpos="3" act="3 3" ctrl="3 3"/>
+      <key name="two" time="2" qpos="2 22" act="2 2" ctrl="2 2"/>
+      <key name="three" time="3" qpos="3 33" act="3 3" ctrl="3 3"/>
     </keyframe>
   </mujoco>)";
 
@@ -594,7 +597,10 @@ TEST_F(MujocoTest, AttachSame) {
         <body name="targetbody"/>
         <body/>
       </body>
-      <body name="ignore"/>
+      <body name="ignore">
+        <geom size=".1"/>
+        <joint type="slide"/>
+      </body>
       <frame name="frame" pos=".1 0 0" euler="0 90 0">
         <body name="attached-body-1">
           <joint type="hinge" name="attached-hinge-1"/>
@@ -634,10 +640,10 @@ TEST_F(MujocoTest, AttachSame) {
     </contact>
 
     <keyframe>
-      <key name="two" time="2" qpos="2 0" act="2 2 0 0" ctrl="2 2 0 0"/>
-      <key name="three" time="3" qpos="3 0" act="3 3 0 0" ctrl="3 3 0 0"/>
-      <key name="attached-two-1" time="2" qpos="0 2" act="0 0 2 2" ctrl="0 0 2 2"/>
-      <key name="attached-three-1" time="3" qpos="0 3" act="0 0 3 3" ctrl="0 0 3 3"/>
+      <key name="two" time="2" qpos="2 22 0" act="2 2 0 0" ctrl="2 2 0 0"/>
+      <key name="three" time="3" qpos="3 33 0" act="3 3 0 0" ctrl="3 3 0 0"/>
+      <key name="attached-two-1" time="2" qpos="0 22 2" act="0 0 2 2" ctrl="0 0 2 2"/>
+      <key name="attached-three-1" time="3" qpos="0 33 3" act="0 0 3 3" ctrl="0 0 3 3"/>
     </keyframe>
   </mujoco>)";
 
@@ -654,8 +660,8 @@ TEST_F(MujocoTest, AttachSame) {
   EXPECT_THAT(body, NotNull());
 
   // attach child to parent frame
-  EXPECT_THAT(
-      mjs_attachBody(frame, body, /*prefix=*/"attached-", /*suffix=*/"-1"), 0);
+  mjsBody* attached = mjs_attachBody(frame, body, "attached-", "-1");
+  EXPECT_THAT(attached, mjs_findBody(parent, "attached-body-1"));
 
   // compile new model
   mjModel* m_attached = mj_compile(parent, 0);
@@ -776,8 +782,8 @@ TEST_F(MujocoTest, AttachDifferent) {
   EXPECT_THAT(body, NotNull());
 
   // attach child to parent frame
-  EXPECT_EQ(
-      mjs_attachBody(frame, body, /*prefix=*/"attached-", /*suffix=*/"-1"), 0);
+  mjsBody* attached = mjs_attachBody(frame, body, "attached-", "-1");
+  EXPECT_THAT(attached, mjs_findBody(parent, "attached-body-1"));
 
   // compile new model
   mjModel* m_attached = mj_compile(parent, 0);
@@ -898,8 +904,8 @@ TEST_F(MujocoTest, AttachFrame) {
   EXPECT_THAT(frame, NotNull());
 
   // attach child frame to parent body
-  EXPECT_THAT(
-      mjs_attachFrame(body, frame, /*prefix=*/"attached-", /*suffix=*/"-1"), 0);
+  mjsFrame* attached = mjs_attachFrame(body, frame, "attached-", "-1");
+  EXPECT_THAT(attached, mjs_findFrame(parent, "attached-pframe-1"));
 
   // compile new model
   mjModel* m_attached = mj_compile(parent, 0);
@@ -942,7 +948,10 @@ void TestDetachBody(bool compile) {
         <frame name="cframe">
         </frame>
       </frame>
-      <body name="ignore"/>
+      <body name="ignore">
+        <geom size=".1"/>
+        <joint type="slide"/>
+      </body>
       <frame name="frame" pos=".1 0 0" euler="0 90 0"/>
     </worldbody>
 
@@ -951,8 +960,8 @@ void TestDetachBody(bool compile) {
     </sensor>
 
     <keyframe>
-      <key name="two" time="2"/>
-      <key name="three" time="3"/>
+      <key name="two" time="2" qpos="22"/>
+      <key name="three" time="3" qpos="33"/>
     </keyframe>
   </mujoco>)";
 
@@ -1243,6 +1252,36 @@ TEST_F(MujocoTest, AttachUnnamedAssets) {
   mj_deleteSpec(child);
   mj_deleteSpec(spec);
   mj_deleteModel(model);
+}
+
+TEST_F(MujocoTest, InitTexture) {
+  mjSpec* spec = mj_makeSpec();
+  EXPECT_THAT(spec, NotNull());
+
+  mjsTexture* texture = mjs_addTexture(spec);
+  mjs_setString(texture->name, "checker");
+  texture->type = mjTEXTURE_CUBE;
+  texture->builtin = mjBUILTIN_CHECKER;
+  texture->width = 300;
+  texture->height = 300;
+
+  mjsMaterial* material = mjs_addMaterial(spec, 0);
+  mjs_setString(material->name, "floor");
+  mjs_setInStringVec(material->textures, mjTEXROLE_RGB, "checker");
+
+  mjsGeom* floor = mjs_addGeom(mjs_findBody(spec, "world"), 0);
+  mjs_setString(floor->material, "floor");
+  floor->type = mjGEOM_PLANE;
+  floor->size[0] = 1;
+  floor->size[1] = 1;
+  floor->size[2] = 0.01;
+  mjs_setString(floor->material, "floor");
+
+  mjModel* model = mj_compile(spec, 0);
+  EXPECT_THAT(model, NotNull());
+
+  mj_deleteModel(model);
+  mj_deleteSpec(spec);
 }
 
 }  // namespace

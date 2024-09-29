@@ -2694,6 +2694,11 @@ void mjXReader::OneFlexcomp(XMLElement* elem, mjsBody* body, const mjVFS* vfs) {
     ReadAttr(elasticity, "thickness", 1, &dflex.thickness, text);
   }
 
+  // check errors
+  if (elasticity && fcomp.equality) {
+    throw mjXError(elem, "elasticity and edge constraints cannot both be present");
+  }
+
   // contact
   XMLElement* cont = FirstChildElement(elem, "contact");
   if (cont) {
@@ -3231,9 +3236,7 @@ void mjXReader::Asset(XMLElement* section, const mjVFS* vfs) {
       }
       ReadAttrInt(elem, "width", &texture->width);
       ReadAttrInt(elem, "height", &texture->height);
-      if (!ReadAttrInt(elem, "nchannel", &texture->nchannel)) {
-        texture->nchannel = 3;
-      }
+      ReadAttrInt(elem, "nchannel", &texture->nchannel);
       ReadAttr(elem, "rgb1", 3, texture->rgb1, text);
       ReadAttr(elem, "rgb2", 3, texture->rgb2, text);
       ReadAttr(elem, "markrgb", 3, texture->markrgb, text);
@@ -3624,7 +3627,7 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
         UpdateString(suffix, count, i);
 
         // attach to parent
-        if (mjs_attachFrame(body, pframe, /*prefix=*/"", suffix.c_str()) != 0) {
+        if (!mjs_attachFrame(body, pframe, /*prefix=*/"", suffix.c_str())) {
           throw mjXError(elem, mjs_getError(spec));
         }
       }
@@ -3701,7 +3704,7 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
         if (!child) {
           throw mjXError(0, "could not find body '%s''%s'", body_name.c_str());
         }
-        if (mjs_attachBody(pframe, child, prefix.c_str(), "") != 0) {
+        if (!mjs_attachBody(pframe, child, prefix.c_str(), "")) {
           throw mjXError(elem, mjs_getError(spec));
         }
       } else {
