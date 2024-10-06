@@ -3171,6 +3171,7 @@ int mj_setLengthRange(mjModel* m, mjData* d, int index,
 mjSpec* mj_makeSpec(void);
 mjSpec* mj_copySpec(const mjSpec* s);
 void mj_deleteSpec(mjSpec* s);
+int mjs_activatePlugin(mjSpec* s, const char* name);
 void mj_printFormattedModel(const mjModel* m, const char* filename, const char* float_format);
 void mj_printModel(const mjModel* m, const char* filename);
 void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
@@ -3589,6 +3590,7 @@ mjsSkin* mjs_addSkin(mjSpec* s);
 mjsTexture* mjs_addTexture(mjSpec* s);
 mjsMaterial* mjs_addMaterial(mjSpec* s, mjsDefault* def);
 mjSpec* mjs_getSpec(mjsBody* body);
+mjSpec* mjs_getSpecFromFrame(mjsFrame* frame);
 mjsBody* mjs_findBody(mjSpec* s, const char* name);
 mjsElement* mjs_findElement(mjSpec* s, mjtObj type, const char* name);
 mjsBody* mjs_findChild(mjsBody* body, const char* name);
@@ -3597,8 +3599,8 @@ mjsDefault* mjs_getDefault(mjsElement* element);
 mjsDefault* mjs_findDefault(mjSpec* s, const char* classname);
 mjsDefault* mjs_getSpecDefault(mjSpec* s);
 int mjs_getId(mjsElement* element);
-mjsElement* mjs_firstChild(mjsBody* body, mjtObj type);
-mjsElement* mjs_nextChild(mjsBody* body, mjsElement* child);
+mjsElement* mjs_firstChild(mjsBody* body, mjtObj type, int recurse);
+mjsElement* mjs_nextChild(mjsBody* body, mjsElement* child, int recurse);
 mjsElement* mjs_firstElement(mjSpec* s, mjtObj type);
 mjsElement* mjs_nextElement(mjSpec* s, mjsElement* element);
 void mjs_setBuffer(mjByteVec* dest, const void* array, int size);
@@ -3614,7 +3616,6 @@ void mjs_setDouble(mjDoubleVec* dest, const double* array, int size);
 void mjs_setPluginAttributes(mjsPlugin* plugin, void* attributes);
 const char* mjs_getString(const mjString* source);
 const double* mjs_getDouble(const mjDoubleVec* source, int* size);
-void mjs_setActivePlugins(mjSpec* s, void* activeplugins);
 void mjs_setDefault(mjsElement* element, mjsDefault* def);
 void mjs_setFrame(mjsElement* dest, mjsFrame* frame);
 const char* mjs_resolveOrientation(double quat[4], mjtByte degree, const char* sequence,

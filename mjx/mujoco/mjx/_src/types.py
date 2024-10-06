@@ -198,10 +198,14 @@ class WrapType(enum.IntEnum):
   Members:
     JOINT: constant moment arm
     SITE: pass through site
+    SPHERE: wrap around sphere
+    CYLINDER: wrap around (infinite) cylinder
   """
   JOINT = mujoco.mjtWrap.mjWRAP_JOINT
   SITE = mujoco.mjtWrap.mjWRAP_SITE
-  # unsupported: NONE, PULLEY, SPHERE, CYLINDER
+  SPHERE = mujoco.mjtWrap.mjWRAP_SPHERE
+  CYLINDER = mujoco.mjtWrap.mjWRAP_CYLINDER
+  # unsupported: NONE, PULLEY
 
 
 class TrnType(enum.IntEnum):
@@ -1265,8 +1269,8 @@ class Data(PyTreeNode):
   xfrc_applied: jax.Array
   eq_active: jax.Array
   # mocap data:
-  mocap_pos: jax.Array = _restricted_to('mujoco')
-  mocap_quat: jax.Array = _restricted_to('mujoco')
+  mocap_pos: jax.Array
+  mocap_quat: jax.Array
   # dynamics:
   qacc: jax.Array
   act_dot: jax.Array

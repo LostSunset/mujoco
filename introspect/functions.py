@@ -1045,6 +1045,26 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
          ),
          doc='Free memory allocation in mjSpec.',
      )),
+    ('mjs_activatePlugin',
+     FunctionDecl(
+         name='mjs_activatePlugin',
+         return_type=ValueType(name='int'),
+         parameters=(
+             FunctionParameterDecl(
+                 name='s',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjSpec'),
+                 ),
+             ),
+             FunctionParameterDecl(
+                 name='name',
+                 type=PointerType(
+                     inner_type=ValueType(name='char', is_const=True),
+                 ),
+             ),
+         ),
+         doc='Activate plugin, return slot number.',
+     )),
     ('mj_printFormattedModel',
      FunctionDecl(
          name='mj_printFormattedModel',
@@ -9662,6 +9682,22 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
          ),
          doc='Get spec from body.',
      )),
+    ('mjs_getSpecFromFrame',
+     FunctionDecl(
+         name='mjs_getSpecFromFrame',
+         return_type=PointerType(
+             inner_type=ValueType(name='mjSpec'),
+         ),
+         parameters=(
+             FunctionParameterDecl(
+                 name='frame',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsFrame'),
+                 ),
+             ),
+         ),
+         doc='Get spec from frame.',
+     )),
     ('mjs_findBody',
      FunctionDecl(
          name='mjs_findBody',
@@ -9839,8 +9875,12 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
                  name='type',
                  type=ValueType(name='mjtObj'),
              ),
+             FunctionParameterDecl(
+                 name='recurse',
+                 type=ValueType(name='int'),
+             ),
          ),
-         doc="Return body's first child of given type.",
+         doc="Return body's first child of given type. If recurse is nonzero, also search the body's subtree.",  # pylint: disable=line-too-long
      )),
     ('mjs_nextChild',
      FunctionDecl(
@@ -9861,8 +9901,12 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
                      inner_type=ValueType(name='mjsElement'),
                  ),
              ),
+             FunctionParameterDecl(
+                 name='recurse',
+                 type=ValueType(name='int'),
+             ),
          ),
-         doc="Return body's next child of the same type; return NULL if child is last.",  # pylint: disable=line-too-long
+         doc="Return body's next child of the same type; return NULL if child is last. If recurse is nonzero, also search the body's subtree.",  # pylint: disable=line-too-long
      )),
     ('mjs_firstElement',
      FunctionDecl(
@@ -10191,26 +10235,6 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
              ),
          ),
          doc='Get double array contents and optionally its size.',
-     )),
-    ('mjs_setActivePlugins',
-     FunctionDecl(
-         name='mjs_setActivePlugins',
-         return_type=ValueType(name='void'),
-         parameters=(
-             FunctionParameterDecl(
-                 name='s',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjSpec'),
-                 ),
-             ),
-             FunctionParameterDecl(
-                 name='activeplugins',
-                 type=PointerType(
-                     inner_type=ValueType(name='void'),
-                 ),
-             ),
-         ),
-         doc='Set active plugins.',
      )),
     ('mjs_setDefault',
      FunctionDecl(

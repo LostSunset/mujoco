@@ -119,6 +119,10 @@ mjModel* mj_compile(mjSpec* s, const mjVFS* vfs) {
 // attach body to a frame of the parent
 mjsBody* mjs_attachBody(mjsFrame* parent, const mjsBody* child,
                         const char* prefix, const char* suffix) {
+  if (!parent) {
+    mju_error("parent frame is null");
+    return nullptr;
+  }
   mjCFrame* frame_parent = static_cast<mjCFrame*>(parent->element);
   mjCBody* child_body = static_cast<mjCBody*>(child->element);
   try {
@@ -137,6 +141,10 @@ mjsBody* mjs_attachBody(mjsFrame* parent, const mjsBody* child,
 // attach frame to a parent body
 mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
                           const char* prefix, const char* suffix) {
+  if (!parent) {
+    mju_error("parent body is null");
+    return nullptr;
+  }
   mjCBody* body_parent = static_cast<mjCBody*>(parent->element);
   mjCFrame* child_frame = static_cast<mjCFrame*>(child->element);
   try {
@@ -193,6 +201,21 @@ void mj_deleteSpec(mjSpec* s) {
 void mjs_addSpec(mjSpec* s, mjSpec* child) {
   mjCModel* model = static_cast<mjCModel*>(s->element);
   model->AppendSpec(child);
+}
+
+
+
+// activate plugin
+int mjs_activatePlugin(mjSpec* s, const char* name) {
+  int plugin_slot = -1;
+  const mjpPlugin* plugin = mjp_getPlugin(name, &plugin_slot);
+  if (!plugin) {
+    mju_error("unknown plugin '%s'", name);
+    return -1;
+  }
+  mjCModel* model = static_cast<mjCModel*>(s->element);
+  model->ActivatePlugin(plugin, plugin_slot);
+  return plugin_slot;
 }
 
 
@@ -498,9 +521,16 @@ mjsDefault* mjs_addDefault(mjSpec* s, const char* classname, const mjsDefault* p
 
 
 
-// get objects
+// get spec from body
 mjSpec* mjs_getSpec(mjsBody* body) {
   return &(static_cast<mjCBody*>(body->element)->model->spec);
+}
+
+
+
+// get spec from frame
+mjSpec* mjs_getSpecFromFrame(mjsFrame* frame) {
+  return &(static_cast<mjCFrame*>(frame->element)->model->spec);
 }
 
 
@@ -632,17 +662,27 @@ void mjs_setDefault(mjsElement* element, mjsDefault* defspec) {
 
 
 // return first child of selected type
-mjsElement* mjs_firstChild(mjsBody* body, mjtObj type) {
+mjsElement* mjs_firstChild(mjsBody* body, mjtObj type, int recurse) {
   mjCBody* bodyC = static_cast<mjCBody*>(body->element);
-  return bodyC->NextChild(NULL, type);
+  try {
+    return bodyC->NextChild(NULL, type, recurse);
+  } catch (mjCError& e) {
+    bodyC->model->SetError(e);
+    return nullptr;
+  }
 }
 
 
 
 // return body's next child; return NULL if child is last
-mjsElement* mjs_nextChild(mjsBody* body, mjsElement* child) {
+mjsElement* mjs_nextChild(mjsBody* body, mjsElement* child, int recurse) {
   mjCBody* bodyC = static_cast<mjCBody*>(body->element);
-  return bodyC->NextChild(child);
+  try {
+    return bodyC->NextChild(child, child->elemtype, recurse);
+  } catch(mjCError& e) {
+    bodyC->model->SetError(e);
+    return nullptr;
+  }
 }
 
 
@@ -1015,16 +1055,6 @@ void mjs_setPluginAttributes(mjsPlugin* plugin, void* attributes) {
   std::map<std::string, std::string, std::less<>>* config_attribs =
       reinterpret_cast<std::map<std::string, std::string, std::less<>>*>(attributes);
   pluginC->config_attribs = std::move(*config_attribs);
-}
-
-
-
-// Set active plugins.
-void mjs_setActivePlugins(mjSpec* s, void* activeplugins) {
-  mjCModel* modelC = static_cast<mjCModel*>(s->element);
-  std::vector<std::pair<const mjpPlugin*, int>>* active_plugins =
-      reinterpret_cast<std::vector<std::pair<const mjpPlugin*, int>>*>(activeplugins);
-  modelC->SetActivePlugins(std::move(*active_plugins));
 }
 
 
