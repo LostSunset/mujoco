@@ -8,16 +8,23 @@ Upcoming version (not yet released)
 General
 ^^^^^^^
 
+- The Newton solver no longer requires ``nv*nv`` memory allocation, allowing for much larger models. See e.g.,
+  `100_humanoids.xml  <https://github.com/google-deepmind/mujoco/blob/main/model/humanoid/100_humanoids.xml>`__.
+  Two quadratic-memory allocations still remain to be fully sparsified: ``mjData.actuator_moment`` and the matrices used
+  by the PGS solver.
 - Removed the :at:`solid` and :at:`membrane` plugins and moved the associated computations into the engine. See `3D
   example model <https://github.com/google-deepmind/mujoco/blob/main/model/flex/floppy.xml>`__ and `2D example model
-  <https://github.com/google-deepmind/mujoco/blob/main/src/model/trampoline.xml>`__ for examples of flex objects
+  <https://github.com/google-deepmind/mujoco/blob/main/model/flex/trampoline.xml>`__ for examples of flex objects
   that previously required these plugins.
 - Replaced the function ``mjs_setActivePlugins`` with :ref:`mjs_activatePlugin`.
 
 MJX
 ^^^
 - Added ``mocap_pos`` and ``mocap_quat`` in kinematics.
-- Added support for :ref:`spatial tendons <tendon-spatial>` with external sphere and cylinder wrapping.
+- Added support for :ref:`spatial tendons <tendon-spatial>` with pulleys and external sphere and cylinder wrapping.
+- Added sphere-cylinder and sphere-ellipsoid collision functions (:github:issue:`2126`).
+- Fixed a bug with frictionloss constraints.
+- Added ``TENDONPOS`` sensor.
 
 Bug fixes
 ^^^^^^^^^

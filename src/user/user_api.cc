@@ -29,6 +29,7 @@
 #include "user/user_model.h"
 #include "user/user_objects.h"
 #include "user/user_cache.h"
+#include "user/user_util.h"
 
 namespace {
 
@@ -160,6 +161,31 @@ mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
 
 
 
+// attach child body to a parent site
+mjsBody* mjs_attachToSite(mjsSite* parent, const mjsBody* child,
+                           const char* prefix, const char* suffix) {
+  if (!parent) {
+    mju_error("parent site is null");
+    return nullptr;
+  }
+  mjSpec* spec = mjs_getSpec(parent->element);
+  mjCSite* site = static_cast<mjCSite*>(parent->element);
+  mjCBody* body = site->Body();
+  mjCFrame* frame = body->AddFrame(site->frame);
+  frame->SetParent(body);
+  frame->spec.pos[0] = site->spec.pos[0];
+  frame->spec.pos[1] = site->spec.pos[1];
+  frame->spec.pos[2] = site->spec.pos[2];
+  frame->spec.quat[0] = site->spec.quat[0];
+  frame->spec.quat[1] = site->spec.quat[1];
+  frame->spec.quat[2] = site->spec.quat[2];
+  frame->spec.quat[3] = site->spec.quat[3];
+  mjs_resolveOrientation(frame->spec.quat, spec->degree, spec->eulerseq, &site->spec.alt);
+  return mjs_attachBody(&frame->spec, child, prefix, suffix);
+}
+
+
+
 // get error message from model
 const char* mjs_getError(mjSpec* s) {
   mjCModel* modelC = static_cast<mjCModel*>(s->element);
@@ -210,12 +236,11 @@ int mjs_activatePlugin(mjSpec* s, const char* name) {
   int plugin_slot = -1;
   const mjpPlugin* plugin = mjp_getPlugin(name, &plugin_slot);
   if (!plugin) {
-    mju_error("unknown plugin '%s'", name);
     return -1;
   }
   mjCModel* model = static_cast<mjCModel*>(s->element);
   model->ActivatePlugin(plugin, plugin_slot);
-  return plugin_slot;
+  return 0;
 }
 
 
@@ -522,15 +547,8 @@ mjsDefault* mjs_addDefault(mjSpec* s, const char* classname, const mjsDefault* p
 
 
 // get spec from body
-mjSpec* mjs_getSpec(mjsBody* body) {
-  return &(static_cast<mjCBody*>(body->element)->model->spec);
-}
-
-
-
-// get spec from frame
-mjSpec* mjs_getSpecFromFrame(mjsFrame* frame) {
-  return &(static_cast<mjCFrame*>(frame->element)->model->spec);
+mjSpec* mjs_getSpec(mjsElement* element) {
+  return &(static_cast<mjCBase*>(element)->model->spec);
 }
 
 

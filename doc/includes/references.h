@@ -164,12 +164,13 @@ struct mjData_ {
   mjTimerStat   timer[mjNTIMER];              // timer statistics
 
   // variable sizes
+  int     ncon;              // number of detected contacts
   int     ne;                // number of equality constraints
   int     nf;                // number of friction constraints
   int     nl;                // number of limit constraints
   int     nefc;              // number of constraints
   int     nnzJ;              // number of non-zeros in constraint Jacobian
-  int     ncon;              // number of detected contacts
+  int     nnzL;              // number of non-zeros in Newton Cholesky factor
   int     nisland;           // number of detected constraint islands
 
   // global properties
@@ -385,11 +386,18 @@ struct mjData_ {
   int*    island_efcadr;     // start address in island_efcind                   (nisland x 1)
   int*    island_efcind;     // island constraint indices                        (nefc x 1)
 
-  // computed by mj_projectConstraint (dual solver)
+  // computed by mj_projectConstraint (PGS solver)
   int*    efc_AR_rownnz;     // number of non-zeros in AR                        (nefc x 1)
   int*    efc_AR_rowadr;     // row start address in colind array                (nefc x 1)
   int*    efc_AR_colind;     // column indices in sparse AR                      (nefc x nefc)
   mjtNum* efc_AR;            // J*inv(M)*J' + R                                  (nefc x nefc)
+
+  // computed by mj_fwdConstraint (Newton solver)
+  int*    L_rownnz;          // number of non-zeros in Hessian factor L rows     (nv x 1)
+  int*    L_rowadr;          // row start address in colind array                (nv x 1)
+  int*    L_colind;          // column indices in sparse AR                      (nnzL x 1)
+  mjtNum* L;                 // chol(M + J'*diag(efc_D)*J)                       (nnzL x 1)
+  mjtNum* Lcone;             // L with cone contributions                        (nnzL x 1)
 
   //-------------------- arena-allocated: POSITION, VELOCITY dependent
 
@@ -1739,9 +1747,8 @@ typedef struct mjsOrientation_ {   // alternative orientation specifiers
 } mjsOrientation;
 typedef struct mjsPlugin_ {        // plugin specification
   mjsElement* element;             // element type
-  mjString* name;                  // name
-  mjString* instance_name;         // instance name
-  int plugin_slot;                 // global registered slot number of the plugin
+  mjString* name;                  // instance name
+  mjString* plugin_name;           // plugin name
   mjtByte active;                  // is the plugin active
   mjString* info;                  // message appended to compiler errors
 } mjsPlugin;
@@ -3557,6 +3564,8 @@ mjsBody* mjs_attachBody(mjsFrame* parent, const mjsBody* child,
                         const char* prefix, const char* suffix);
 mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
                           const char* prefix, const char* suffix);
+mjsBody* mjs_attachToSite(mjsSite* parent, const mjsBody* child,
+                          const char* prefix, const char* suffix);
 int mjs_detachBody(mjSpec* s, mjsBody* b);
 mjsBody* mjs_addBody(mjsBody* body, mjsDefault* def);
 mjsSite* mjs_addSite(mjsBody* body, mjsDefault* def);
@@ -3589,8 +3598,7 @@ mjsHField* mjs_addHField(mjSpec* s);
 mjsSkin* mjs_addSkin(mjSpec* s);
 mjsTexture* mjs_addTexture(mjSpec* s);
 mjsMaterial* mjs_addMaterial(mjSpec* s, mjsDefault* def);
-mjSpec* mjs_getSpec(mjsBody* body);
-mjSpec* mjs_getSpecFromFrame(mjsFrame* frame);
+mjSpec* mjs_getSpec(mjsElement* element);
 mjsBody* mjs_findBody(mjSpec* s, const char* name);
 mjsElement* mjs_findElement(mjSpec* s, mjtObj type, const char* name);
 mjsBody* mjs_findChild(mjsBody* body, const char* name);

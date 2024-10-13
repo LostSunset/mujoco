@@ -170,7 +170,7 @@ TEST_F(PluginTest, ActivatePlugin) {
 
   // associate plugin to body
   mjsBody* body = mjs_addBody(mjs_findBody(spec, "world"), 0);
-  mjs_setString(body->plugin.name, "mujoco.elasticity.cable");
+  mjs_setString(body->plugin.plugin_name, "mujoco.elasticity.cable");
   body->plugin.element = mjs_addPlugin(spec)->element;
   body->plugin.active = true;
   mjsGeom* geom = mjs_addGeom(body, 0);
@@ -204,7 +204,7 @@ TEST_F(PluginTest, DeletePlugin) {
   // add actuator
   mjsActuator* actuator = mjs_addActuator(spec, 0);
   mjs_setString(actuator->target, "j1");
-  mjs_setString(actuator->plugin.name, "mujoco.pid");
+  mjs_setString(actuator->plugin.plugin_name, "mujoco.pid");
   actuator->plugin.element = mjs_addPlugin(spec)->element;
   actuator->plugin.active = true;
   actuator->trntype = mjTRN_JOINT;
@@ -1077,6 +1077,69 @@ void TestDetachBody(bool compile) {
 TEST_F(MujocoTest, DetachBody) {
   TestDetachBody(/*compile=*/false);
   TestDetachBody(/*compile=*/true);
+}
+
+TEST_F(MujocoTest, AttachToSite) {
+  std::array<char, 1000> er;
+  mjtNum tol = 0;
+  std::string field = "";
+
+  static constexpr char xml_parent[] = R"(
+  <mujoco>
+    <worldbody>
+      <site name="site" pos="1 0 0" quat="0 1 0 0"/>
+    </worldbody>
+  </mujoco>)";
+
+  static constexpr char xml_child[] = R"(
+  <mujoco>
+    <worldbody>
+      <body name="sphere">
+        <joint type="slide"/>
+        <geom size=".1"/>
+      </body>
+    </worldbody>
+  </mujoco>)";
+
+  static constexpr char xml_result[] = R"(
+  <mujoco>
+    <worldbody>
+      <site name="site" pos="1 0 0" quat="0 1 0 0"/>
+      <frame pos="1 0 0" quat="0 1 0 0">
+        <body name="attached-sphere-1">
+          <joint type="slide"/>
+          <geom size=".1"/>
+        </body>
+      </frame>
+    </worldbody>
+  </mujoco>)";
+
+  mjSpec* parent = mj_parseXMLString(xml_parent, 0, er.data(), er.size());
+  EXPECT_THAT(parent, NotNull()) << er.data();
+  mjSpec* child = mj_parseXMLString(xml_child, 0, er.data(), er.size());
+  EXPECT_THAT(child, NotNull()) << er.data();
+
+  mjsBody* world = mjs_findBody(parent, "world");
+  EXPECT_THAT(world, NotNull());
+  mjsSite* site = mjs_asSite(mjs_firstChild(world, mjOBJ_SITE, 0));
+  EXPECT_THAT(site, NotNull());
+  mjsBody* body = mjs_findBody(child, "sphere");
+  EXPECT_THAT(body, NotNull());
+  mjsBody* attached = mjs_attachToSite(site, body, "attached-", "-1");
+  EXPECT_THAT(attached, NotNull());
+
+  mjModel* model = mj_compile(parent, 0);
+  EXPECT_THAT(model, NotNull());
+  mjModel* expected = LoadModelFromString(xml_result, er.data(), er.size());
+  EXPECT_THAT(expected, NotNull()) << er.data();
+  EXPECT_LE(CompareModel(model, expected, field), tol)
+            << "Expected and attached models are different!\n"
+            << "Different field: " << field << '\n';
+
+  mj_deleteSpec(parent);
+  mj_deleteSpec(child);
+  mj_deleteModel(model);
+  mj_deleteModel(expected);
 }
 
 TEST_F(MujocoTest, PreserveState) {

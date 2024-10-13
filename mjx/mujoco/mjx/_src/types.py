@@ -170,6 +170,7 @@ class SolverType(enum.IntEnum):
 
   Members:
     CG: Conjugate gradient (primal)
+    NEWTON: Newton (primal)
   """
   # unsupported: PGS
   CG = mujoco.mjtSolver.mjSOL_CG
@@ -197,15 +198,16 @@ class WrapType(enum.IntEnum):
 
   Members:
     JOINT: constant moment arm
+    PULLEY: pulley used to split tendon
     SITE: pass through site
     SPHERE: wrap around sphere
     CYLINDER: wrap around (infinite) cylinder
   """
   JOINT = mujoco.mjtWrap.mjWRAP_JOINT
+  PULLEY = mujoco.mjtWrap.mjWRAP_PULLEY
   SITE = mujoco.mjtWrap.mjWRAP_SITE
   SPHERE = mujoco.mjtWrap.mjWRAP_SPHERE
   CYLINDER = mujoco.mjtWrap.mjWRAP_CYLINDER
-  # unsupported: NONE, PULLEY
 
 
 class TrnType(enum.IntEnum):
@@ -306,6 +308,7 @@ class SensorType(enum.IntEnum):
     CAMPROJECTION: camera projection
     RANGEFINDER: rangefinder
     JOINTPOS: joint position
+    TENDONPOS: scalar tendon position
     ACTUATORPOS: actuator position
     BALLQUAT: ball joint orientation
     FRAMEPOS: frame position
@@ -336,6 +339,7 @@ class SensorType(enum.IntEnum):
   CAMPROJECTION = mujoco.mjtSensor.mjSENS_CAMPROJECTION
   RANGEFINDER = mujoco.mjtSensor.mjSENS_RANGEFINDER
   JOINTPOS = mujoco.mjtSensor.mjSENS_JOINTPOS
+  TENDONPOS = mujoco.mjtSensor.mjSENS_TENDONPOS
   ACTUATORPOS = mujoco.mjtSensor.mjSENS_ACTUATORPOS
   BALLQUAT = mujoco.mjtSensor.mjSENS_BALLQUAT
   FRAMEPOS = mujoco.mjtSensor.mjSENS_FRAMEPOS

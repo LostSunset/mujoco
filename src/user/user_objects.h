@@ -587,6 +587,9 @@ class mjCSite : public mjCSite_, private mjsSite {
 
   mjsSite spec;                   // variables set by user
 
+  // site's body
+  mjCBody* Body() const { return body; }
+
   // use strings from mjCBase rather than mjStrings from mjsSite
   using mjCBase::name;
   using mjCBase::info;
@@ -1412,7 +1415,7 @@ class mjCPlugin_ : public mjCBase {
   std::vector<char> flattened_attributes;  // config attributes flattened in plugin-declared order;
 
  protected:
-  std::string instance_name;
+  std::string plugin_name;
 };
 
 class mjCPlugin : public mjCPlugin_ {
@@ -1424,11 +1427,11 @@ class mjCPlugin : public mjCPlugin_ {
   mjCPlugin(const mjCPlugin& other);
   mjCPlugin& operator=(const mjCPlugin& other);
   mjsPlugin spec;
-  mjCBase* parent;   // parent object (only used when generating error message)
+  mjCBase* parent;  // parent object (only used when generating error message)
+  int plugin_slot;  // global registered slot number of the plugin
 
  private:
   void Compile(void);              // compiler
-  void NameSpace(const mjCModel* m);
 };
 
 

@@ -820,14 +820,14 @@ void mjXWriter::OneActuator(XMLElement* elem, const mjCActuator* actuator, mjCDe
 
 // write plugin
 void mjXWriter::OnePlugin(XMLElement* elem, const mjsPlugin* plugin) {
-  const string instance_name = string(mjs_getString(plugin->instance_name));
-  const string plugin_name = string(mjs_getString(plugin->name));
+  const string instance_name = string(mjs_getString(plugin->name));
+  const string plugin_name = string(mjs_getString(plugin->plugin_name));
   if (!instance_name.empty()) {
     WriteAttrTxt(elem, "instance", instance_name);
   } else {
     WriteAttrTxt(elem, "plugin", plugin_name);
     const mjpPlugin* pplugin = mjp_getPluginAtSlot(
-        static_cast<mjCPlugin*>(plugin->element)->spec.plugin_slot);
+        static_cast<mjCPlugin*>(plugin->element)->plugin_slot);
     const char* c = &(static_cast<mjCPlugin*>(plugin->element)->flattened_attributes[0]);
     for (int i = 0; i < pplugin->nattribute; ++i) {
       string value(c);
@@ -1338,7 +1338,7 @@ void mjXWriter::Extension(XMLElement* root) {
     }
 
     // check if we need to open a new <plugin> section
-    const mjpPlugin* plugin = mjp_getPluginAtSlot(pp->spec.plugin_slot);
+    const mjpPlugin* plugin = mjp_getPluginAtSlot(pp->plugin_slot);
     if (plugin != last_plugin) {
       plugin_elem = InsertEnd(section, "plugin");
       WriteAttrTxt(plugin_elem, "plugin", plugin->name);
@@ -1717,11 +1717,6 @@ void mjXWriter::Body(XMLElement* elem, mjCBody* body, mjCFrame* frame, string_vi
                                ? fframe->classname
                                : body->classname;
         Body(OneFrame(elem, fframe), body, fframe, childclass);
-      }
-
-      // stop if we reached the frame of the current child body, ignore if there are no bodies
-      if (bframe && bframe == fframe) {
-        break;
       }
     }
 

@@ -13,7 +13,7 @@
      limitations under the License.
 -->
 
-<mujoco model="22 Humanoids">
+<mujoco model="100 Humanoids">
   <option timestep="0.005"/>
 
   <size memory="100M"/>
@@ -28,7 +28,7 @@
   <visual>
     <map force="0.1" zfar="30"/>
     <rgba haze="0.15 0.25 0.35 1"/>
-    <quality shadowsize="4096"/>
+    <quality shadowsize="4096" numslices="16" numstacks="8"/>
     <global offwidth="800" offheight="800"/>
   </visual>
 
@@ -36,9 +36,11 @@
     <geom name="floor" size="10 10 .05" type="plane" material="floor" condim="3"/>
     <light directional="true" diffuse=".4 .4 .4" specular="0.1 0.1 0.1" pos="0 0 5" dir="0 0 -1" castshadow="false"/>
     <light name="spotlight" mode="targetbodycom" target="world" diffuse="1 1 1" specular="0.3 0.3 0.3" pos="-6 -6 4" cutoff="60"/>
-    <replicate count="22" euler="0 0 16.36" sep="-">
-      <frame pos="0 -4 0">
-        <attach model="humanoid" body="torso" prefix="_"/>
+    <replicate count="10" euler="0 0 36" sep="-">
+      <frame pos="1 0 0">
+        <replicate count="10" euler="0 0 15" sep="-" offset="0.5 0 0">
+          <attach model="humanoid" body="torso" prefix="_"/>
+        </replicate>
       </frame>
     </replicate>
     <replicate count="5" euler="0 0 72" sep="-">
