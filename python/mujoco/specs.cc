@@ -335,12 +335,6 @@ PYBIND11_MODULE(_specs, m) {
         A dictionary of assets to be used by the spec. The keys are asset names
         and the values are asset contents.
   )mydelimiter");
-  mjSpec.def(
-      "copy_back",
-      [](MjSpec& self, raw::MjModel& model) {
-        return mj_copyBack(self.ptr, &model);
-      },
-      py::return_value_policy::reference_internal);
   mjSpec.def("to_xml", [](MjSpec& self) -> std::string {
     int size = mj_saveXMLString(self.ptr, nullptr, 0, nullptr, 0);
     std::unique_ptr<char[]> buf(new char[size + 1]);
@@ -571,6 +565,17 @@ PYBIND11_MODULE(_specs, m) {
           throw pybind11::value_error(mjs_getError(mjs_getSpec(self.element)));
         }
         return new_frame;
+      },
+      py::return_value_policy::reference_internal);
+  mjsBody.def(
+    "to_frame",
+      [](raw::MjsBody* self) -> raw::MjsFrame* {
+        raw::MjsFrame* frame = mjs_bodyToFrame(&self);
+        if (!frame) {
+          throw pybind11::value_error(mjs_getError(mjs_getSpec(self->element)));
+        }
+        // TODO: set the body to py::none
+        return frame;
       },
       py::return_value_policy::reference_internal);
 

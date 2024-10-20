@@ -170,7 +170,6 @@ struct mjData_ {
   int     nl;                // number of limit constraints
   int     nefc;              // number of constraints
   int     nnzJ;              // number of non-zeros in constraint Jacobian
-  int     nnzL;              // number of non-zeros in Newton Cholesky factor
   int     nisland;           // number of detected constraint islands
 
   // global properties
@@ -391,13 +390,6 @@ struct mjData_ {
   int*    efc_AR_rowadr;     // row start address in colind array                (nefc x 1)
   int*    efc_AR_colind;     // column indices in sparse AR                      (nefc x nefc)
   mjtNum* efc_AR;            // J*inv(M)*J' + R                                  (nefc x nefc)
-
-  // computed by mj_fwdConstraint (Newton solver)
-  int*    L_rownnz;          // number of non-zeros in Hessian factor L rows     (nv x 1)
-  int*    L_rowadr;          // row start address in colind array                (nv x 1)
-  int*    L_colind;          // column indices in sparse AR                      (nnzL x 1)
-  mjtNum* L;                 // chol(M + J'*diag(efc_D)*J)                       (nnzL x 1)
-  mjtNum* Lcone;             // L with cone contributions                        (nnzL x 1)
 
   //-------------------- arena-allocated: POSITION, VELOCITY dependent
 
@@ -3141,7 +3133,6 @@ mjModel* mj_compile(mjSpec* s, const mjVFS* vfs);
 int mj_recompile(mjSpec* s, const mjVFS* vfs, mjModel* m, mjData* d);
 int mj_saveLastXML(const char* filename, const mjModel* m, char* error, int error_sz);
 void mj_freeLastXML(void);
-void mj_copyBack(mjSpec* s, const mjModel* m);
 int mj_saveXMLString(const mjSpec* s, char* xml, int xml_sz, char* error, int error_sz);
 int mj_saveXML(const mjSpec* s, const char* filename, char* error, int error_sz);
 void mj_step(const mjModel* m, mjData* d);
@@ -3628,6 +3619,7 @@ void mjs_setDefault(mjsElement* element, mjsDefault* def);
 void mjs_setFrame(mjsElement* dest, mjsFrame* frame);
 const char* mjs_resolveOrientation(double quat[4], mjtByte degree, const char* sequence,
                                    const mjsOrientation* orientation);
+mjsFrame* mjs_bodyToFrame(mjsBody** body);
 void mjs_defaultSpec(mjSpec* spec);
 void mjs_defaultOrientation(mjsOrientation* orient);
 void mjs_defaultBody(mjsBody* body);

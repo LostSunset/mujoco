@@ -331,6 +331,9 @@ class mjCBody : public mjCBody_, private mjsBody {
   // reset keyframe references for allowing self-attach
   void ForgetKeyframes() const;
 
+  // create a frame and move all contents of this body into it
+  mjCFrame* ToFrame();
+
   // get mocap position and quaternion
   mjtNum* mpos(const std::string& state_name);
   mjtNum* mquat(const std::string& state_name);
@@ -422,8 +425,6 @@ class mjCJoint_ : public mjCBase {
   mjCBody* body;                   // joint's body
 
   // variable used for temporarily storing the state of the joint
-  int qposadr_;                                        // address of dof in data->qpos
-  int dofadr_;                                         // address of dof in data->qvel
   std::map<std::string, std::array<mjtNum, 7>> qpos_;  // qpos at the previous step
   std::map<std::string, std::array<mjtNum, 6>> qvel_;  // qvel at the previous step
 
@@ -470,6 +471,10 @@ class mjCJoint : public mjCJoint_, private mjsJoint {
  private:
   int Compile(void);               // compiler; return dofnum
   void PointToLocal(void);
+
+  // variables that should not be copied during copy assignment
+  int qposadr_;                                        // address of dof in data->qpos
+  int dofadr_;                                         // address of dof in data->qvel
 };
 
 
@@ -527,6 +532,7 @@ class mjCGeom : public mjCGeom_, private mjsGeom {
   void SetInertia(void);              // compute and set geom inertia
   bool IsVisual(void) const { return visual_; }
   void SetNotVisual(void) { visual_ = false; }
+  mjtGeom Type() const { return type; }
 
   // Compute all coefs modeling the interaction with the surrounding fluid.
   void SetFluidCoefs(void);

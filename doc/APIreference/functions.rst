@@ -87,15 +87,6 @@ mj_freeLastXML
 
 Free last XML model if loaded. Called internally at each load.
 
-.. _mj_copyBack:
-
-mj_copyBack
-~~~~~~~~~~~
-
-.. mujoco-include:: mj_copyBack
-
-Copy (possibly modified) model fields back into spec.
-
 .. _mj_saveXMLString:
 
 mj_saveXMLString
@@ -4399,6 +4390,15 @@ mjs_resolveOrientation
 .. mujoco-include:: mjs_resolveOrientation
 
 Resolve alternative orientations to quat, return error if any.
+
+.. _mjs_bodyToFrame:
+
+mjs_bodyToFrame
+~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_bodyToFrame
+
+Transform body into a frame.
 
 .. _ElementInitialization:
 

@@ -848,7 +848,7 @@ mjCBody& mjCBody::operator+=(const mjCFrame& other) {
   mjCBody* subtree = other.body;
   other.model->prefix = other.prefix;
   other.model->suffix = other.suffix;
-  other.model->StoreKeyframes();
+  other.model->StoreKeyframes(model);
 
   // attach defaults
   if (other.model != model) {
@@ -1161,6 +1161,39 @@ mjCLight* mjCBody::AddLight(mjCDef* _def) {
 
   lights.push_back(obj);
   return obj;
+}
+
+
+
+// create a frame in the parent body and move all contents of this body into it
+mjCFrame* mjCBody::ToFrame() {
+  if (parentid < 0) {
+    // TODO: store the parent pointer instead of using the id
+    throw mjCError(this, "parent body is not defined, please compile the model first");
+  }
+  mjCBody* parent = model->Bodies()[parentid];
+  mjCFrame* newframe = parent->AddFrame(frame);
+  mjuu_copyvec(newframe->spec.pos, spec.pos, 3);
+  mjuu_copyvec(newframe->spec.quat, spec.quat, 4);
+  parent->bodies.insert(parent->bodies.end(), bodies.begin(), bodies.end());
+  parent->geoms.insert(parent->geoms.end(), geoms.begin(), geoms.end());
+  parent->joints.insert(parent->joints.end(), joints.begin(), joints.end());
+  parent->sites.insert(parent->sites.end(), sites.begin(), sites.end());
+  parent->cameras.insert(parent->cameras.end(), cameras.begin(), cameras.end());
+  parent->lights.insert(parent->lights.end(), lights.begin(), lights.end());
+  parent->frames.insert(parent->frames.end(), frames.begin(), frames.end());
+  bodies.clear();
+  geoms.clear();
+  joints.clear();
+  sites.clear();
+  cameras.clear();
+  lights.clear();
+  frames.clear();
+  parent->bodies.erase(
+      std::remove_if(parent->bodies.begin(), parent->bodies.end(),
+                     [this](mjCBody* body) { return body == this; }),
+      parent->bodies.end());
+  return newframe;
 }
 
 
@@ -1775,7 +1808,7 @@ mjCFrame& mjCFrame::operator=(const mjCFrame& other) {
 mjCFrame& mjCFrame::operator+=(const mjCBody& other) {
   other.model->prefix = other.prefix;
   other.model->suffix = other.suffix;
-  other.model->StoreKeyframes();
+  other.model->StoreKeyframes(model);
   other.model->prefix = "";
   other.model->suffix = "";
 
@@ -1918,6 +1951,8 @@ mjCJoint& mjCJoint::operator=(const mjCJoint& other) {
     this->spec = other.spec;
     *static_cast<mjCJoint_*>(this) = static_cast<const mjCJoint_&>(other);
     *static_cast<mjsJoint*>(this) = static_cast<const mjsJoint&>(other);
+    qposadr_ = -1;
+    dofadr_ = -1;
   }
   PointToLocal();
   return *this;
@@ -6364,6 +6399,12 @@ void mjCSensor::Compile(void) {
     // objects must be different
     if (objtype == reftype && obj == ref) {
       throw mjCError(this, "1st body/geom must be different from 2nd body/geom");
+    }
+
+    // height fields are not necessarily convex and are not yet supported
+    if ((objtype == mjOBJ_GEOM && static_cast<mjCGeom*>(obj)->Type() == mjGEOM_HFIELD) ||
+        (reftype == mjOBJ_GEOM && static_cast<mjCGeom*>(ref)->Type() == mjGEOM_HFIELD)) {
+      throw mjCError(this, "height fields are not supported in geom distance sensors");
     }
 
     // set

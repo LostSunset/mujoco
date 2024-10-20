@@ -317,26 +317,6 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
          parameters=(),
          doc='Free last XML model if loaded. Called internally at each load.',
      )),
-    ('mj_copyBack',
-     FunctionDecl(
-         name='mj_copyBack',
-         return_type=ValueType(name='void'),
-         parameters=(
-             FunctionParameterDecl(
-                 name='s',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjSpec'),
-                 ),
-             ),
-             FunctionParameterDecl(
-                 name='m',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjModel', is_const=True),
-                 ),
-             ),
-         ),
-         doc='Copy (possibly modified) model fields back into spec.',
-     )),
     ('mj_saveXMLString',
      FunctionDecl(
          name='mj_saveXMLString',
@@ -10326,6 +10306,24 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
              ),
          ),
          doc='Resolve alternative orientations to quat, return error if any.',
+     )),
+    ('mjs_bodyToFrame',
+     FunctionDecl(
+         name='mjs_bodyToFrame',
+         return_type=PointerType(
+             inner_type=ValueType(name='mjsFrame'),
+         ),
+         parameters=(
+             FunctionParameterDecl(
+                 name='body',
+                 type=PointerType(
+                     inner_type=PointerType(
+                         inner_type=ValueType(name='mjsBody'),
+                     ),
+                 ),
+             ),
+         ),
+         doc='Transform body into a frame.',
      )),
     ('mjs_defaultSpec',
      FunctionDecl(
