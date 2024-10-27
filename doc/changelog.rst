@@ -5,10 +5,24 @@ Changelog
 Upcoming version (not yet released)
 -----------------------------------
 
+General
+^^^^^^^
+- The global compiler flag ``exactmeshinertia`` has been removed and replaced with the mesh-specific
+  :ref:`inertia<asset-mesh-inertia>` attribute.
+- Removed the deprecated ``mju_rotVecMat`` and ``mju_rotVecMatT`` functions.
+- Sorting now uses a faster, native sort function (fixes :github:issue:`1638`).
+- The PBR texture layers introduced in 3.2.1 were refactored from seperate sub-elements to a single
+  :ref:`layer<material-layer>` sub-element.
+
 MJX
 ^^^
+- Added ``apply_ft``, ``jac``, and  ``xfrc_accumulate`` as public functions.
+- Added ``TOUCH`` sensor.
+- Added support for ``eq_active``. Fixes :github:issue:`2173`.
 
-1. Added ``apply_ft``, ``jac``, and  ``xfrc_accumulate`` as public functions.
+Bug fixes
+^^^^^^^^^
+- Fixed a bug in slider-crank :ref:`transmission<geTransmission>`. The bug was introduced in 3.0.0.
 
 Version 3.2.4 (Oct 15, 2024)
 ----------------------------
@@ -158,7 +172,7 @@ General
 2. Added a new :ref:`autoreset<option-flag-autoreset>` flag to disable automatic reset when NaNs or infinities are
    detected.
 3. Added sub-elements to the MJCF :ref:`material<asset-material>` element, to allow specification of multiple textures
-   for rendering (e.g., :ref:`occlusion-roughness-metallic<material-orm>`). Note that the MuJoCo renderer doesn't
+   for rendering (e.g., ``occlusion, roughness, metallic``). Note that the MuJoCo renderer doesn't
    support these new features, and they are made available for use with external renderers.
 4. Sorting (``mjQUICKSORT``) now calls ``std::sort`` when building with C++ (:github:issue:`1638`).
 
@@ -205,7 +219,7 @@ General
    3. Calls to :ref:`mj_defaultVFS` may allocate memory inside VFS, and the corresponding
       :ref:`mj_deleteVFS` must be called to deallocate any internal allocated memory.
 
-   4. Deprecated :ref:`mju_rotVecMat` and :ref:`mju_rotVecMatT` in favor of :ref:`mju_mulMatVec3` and
+   4. Deprecated ``mju_rotVecMat`` and ``mju_rotVecMatT`` in favor of :ref:`mju_mulMatVec3` and
       :ref:`mju_mulMatTVec3`. These function names and argument order are more consistent with the rest of the API.
       The older functions have been removed from the Python bindings and will be removed from the C API in the next
       release.
@@ -1072,7 +1086,7 @@ Bug fixes
 12. Fixed bug in the handling of ellipsoid-based fluid model forces in the new implicitfast integrator.
 #.  Removed spurious whole-arena copying in `mj_copyData`, which can considerably
     `slow down <https://github.com/google-deepmind/mujoco/issues/568>`__ the copying operation.
-#.  Make :ref:`shellinertia<body-geom-shellinertia>` ignore :ref:`exactmeshinertia<compiler-exactmeshinertia>`, which is
+#. Make :ref:`shellinertia<body-geom-shellinertia>` ignore ``exactmeshinertia``, which is
     only used for legacy volume computations (`#759 <https://github.com/google-deepmind/mujoco/issues/759>`__).
 
 

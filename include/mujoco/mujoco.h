@@ -975,12 +975,6 @@ MJAPI void mju_mulMatVec3(mjtNum res[3], const mjtNum mat[9], const mjtNum vec[3
 // Multiply transposed 3-by-3 matrix by vector: res = mat' * vec.
 MJAPI void mju_mulMatTVec3(mjtNum res[3], const mjtNum mat[9], const mjtNum vec[3]);
 
-// Deprecated, use mju_mulMatVec3(res, mat, vec).
-MJAPI void mju_rotVecMat(mjtNum res[3], const mjtNum vec[3], const mjtNum mat[9]);
-
-// Deprecated, use mju_mulMatTVec3(res, mat, vec).
-MJAPI void mju_rotVecMatT(mjtNum res[3], const mjtNum vec[3], const mjtNum mat[9]);
-
 // Compute cross-product: res = cross(a, b).
 MJAPI void mju_cross(mjtNum res[3], const mjtNum a[3], const mjtNum b[3]);
 
@@ -1079,6 +1073,13 @@ MJAPI void mju_sqrMatTD(mjtNum* res, const mjtNum* mat, const mjtNum* diag, int 
 MJAPI void mju_transformSpatial(mjtNum res[6], const mjtNum vec[6], int flg_force,
                                 const mjtNum newpos[3], const mjtNum oldpos[3],
                                 const mjtNum rotnew2old[9]);
+
+
+//---------------------------------- Sparse math ---------------------------------------------------
+
+// Convert matrix from sparse to dense.
+MJAPI void mju_sparse2dense(mjtNum* res, const mjtNum* mat, int nr, int nc,
+                            const int* rownnz, const int* rowadr, const int* colind);
 
 
 //---------------------------------- Quaternions ---------------------------------------------------
@@ -1526,6 +1527,9 @@ MJAPI mjsMaterial* mjs_addMaterial(mjSpec* s, mjsDefault* def);
 
 // Get spec from body.
 MJAPI mjSpec* mjs_getSpec(mjsElement* element);
+
+// Find spec (model asset) by name.
+MJAPI mjSpec* mjs_findSpec(mjSpec* spec, const char* name);
 
 // Find body in spec by name.
 MJAPI mjsBody* mjs_findBody(mjSpec* s, const char* name);

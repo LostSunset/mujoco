@@ -4075,7 +4075,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='key mocap position',
-                 array_extent=('nkey', '3*nmocap'),
+                 array_extent=('nkey', 'nmocap*3'),
              ),
              StructFieldDecl(
                  name='key_mquat',
@@ -4083,7 +4083,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc='key mocap quaternion',
-                 array_extent=('nkey', '4*nmocap'),
+                 array_extent=('nkey', 'nmocap*4'),
              ),
              StructFieldDecl(
                  name='key_ctrl',
@@ -5126,15 +5126,15 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                  ),
                  doc='geom id; -1: site; -2: pulley',
-                 array_extent=('nwrap*2',),
+                 array_extent=('nwrap', 2),
              ),
              StructFieldDecl(
                  name='wrap_xpos',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
                  ),
-                 doc='Cartesian 3D points in all path',
-                 array_extent=('nwrap*2', 3),
+                 doc='Cartesian 3D points in all paths',
+                 array_extent=('nwrap', 6),
              ),
              StructFieldDecl(
                  name='actuator_length',
@@ -5143,6 +5143,30 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  ),
                  doc='actuator lengths',
                  array_extent=('nu',),
+             ),
+             StructFieldDecl(
+                 name='moment_rownnz',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='number of non-zeros in actuator_moment row',
+                 array_extent=('nu',),
+             ),
+             StructFieldDecl(
+                 name='moment_rowadr',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='row start address in colind array',
+                 array_extent=('nu',),
+             ),
+             StructFieldDecl(
+                 name='moment_colind',
+                 type=PointerType(
+                     inner_type=ValueType(name='int'),
+                 ),
+                 doc='column indices in sparse Jacobian',
+                 array_extent=('nu', 'nv'),
              ),
              StructFieldDecl(
                  name='actuator_moment',
@@ -8776,25 +8800,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              ),
          ),
      )),
-    ('mjSpec',
+    ('mjsCompiler',
      StructDecl(
-         name='mjSpec',
-         declname='struct mjSpec_',
+         name='mjsCompiler',
+         declname='struct mjsCompiler_',
          fields=(
-             StructFieldDecl(
-                 name='element',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjsElement'),
-                 ),
-                 doc='element type',
-             ),
-             StructFieldDecl(
-                 name='modelname',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='model name',
-             ),
              StructFieldDecl(
                  name='autolimits',
                  type=ValueType(name='mjtByte'),
@@ -8821,11 +8831,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='automatically impose A + B >= C rule',
              ),
              StructFieldDecl(
-                 name='strippath',
-                 type=ValueType(name='mjtByte'),
-                 doc='automatically strip paths from mesh files',
-             ),
-             StructFieldDecl(
                  name='fitaabb',
                  type=ValueType(name='mjtByte'),
                  doc='meshfit to aabb instead of inertia box',
@@ -8842,20 +8847,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      extents=(3,),
                  ),
                  doc='sequence for euler rotations',
-             ),
-             StructFieldDecl(
-                 name='meshdir',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='mesh and hfield directory',
-             ),
-             StructFieldDecl(
-                 name='texturedir',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjString'),
-                 ),
-                 doc='texture directory',
              ),
              StructFieldDecl(
                  name='discardvisual',
@@ -8891,11 +8882,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='range of geom groups used to compute inertia',
              ),
              StructFieldDecl(
-                 name='exactmeshinertia',
-                 type=ValueType(name='mjtByte'),
-                 doc='if false, use old formula',
-             ),
-             StructFieldDecl(
                  name='alignfree',
                  type=ValueType(name='int'),
                  doc='align free joints with inertial frame',
@@ -8904,6 +8890,51 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  name='LRopt',
                  type=ValueType(name='mjLROpt'),
                  doc='options for lengthrange computation',
+             ),
+         ),
+     )),
+    ('mjSpec',
+     StructDecl(
+         name='mjSpec',
+         declname='struct mjSpec_',
+         fields=(
+             StructFieldDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+                 doc='element type',
+             ),
+             StructFieldDecl(
+                 name='modelname',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='model name',
+             ),
+             StructFieldDecl(
+                 name='compiler',
+                 type=ValueType(name='mjsCompiler'),
+                 doc='compiler options',
+             ),
+             StructFieldDecl(
+                 name='strippath',
+                 type=ValueType(name='mjtByte'),
+                 doc='automatically strip paths from mesh files',
+             ),
+             StructFieldDecl(
+                 name='meshdir',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='mesh and hfield directory',
+             ),
+             StructFieldDecl(
+                 name='texturedir',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjString'),
+                 ),
+                 doc='texture directory',
              ),
              StructFieldDecl(
                  name='option',
@@ -10266,6 +10297,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      extents=(3,),
                  ),
                  doc='rescale mesh',
+             ),
+             StructFieldDecl(
+                 name='inertia',
+                 type=ValueType(name='mjtMeshInertia'),
+                 doc='inertia type (convex, legacy, exact)',
              ),
              StructFieldDecl(
                  name='smoothnormal',
