@@ -7,22 +7,41 @@ Upcoming version (not yet released)
 
 General
 ^^^^^^^
+
+- The :doc:`Model Editing<programming/modeledit>` framework afforded by :ref:`mjSpec`, introduced in 3.2.0 as an
+  in-development feature, is now stable and recommended for general use.
 - The global compiler flag ``exactmeshinertia`` has been removed and replaced with the mesh-specific
   :ref:`inertia<asset-mesh-inertia>` attribute.
-- Removed the deprecated ``mju_rotVecMat`` and ``mju_rotVecMatT`` functions.
+- The not-useful ``convexhull`` compiler option (to disable computation of mesh convex hulls) has been removed.
+- Removed the deprecated ``mju_rotVecMat``, ``mju_rotVecMatT`` and ``mjv_makeConnector`` functions.
 - Sorting now uses a faster, native sort function (fixes :github:issue:`1638`).
 - The PBR texture layers introduced in 3.2.1 were refactored from seperate sub-elements to a single
   :ref:`layer<material-layer>` sub-element.
+- The composite types box, cylinder, and sphere have been removed. Users should instead use the equivalent types
+  available in :ref:`flexcomp<body-flexcomp>`.
 
 MJX
 ^^^
 - Added ``apply_ft``, ``jac``, and  ``xfrc_accumulate`` as public functions.
 - Added ``TOUCH`` sensor.
 - Added support for ``eq_active``. Fixes :github:issue:`2173`.
+- Added ray intersection with ellipsoid.
 
 Bug fixes
 ^^^^^^^^^
+- Fixed several bugs related to connect and weld constraints with site semantics (fixes :github:issue:`2179`, reported
+  by :github:user:`yinfanyi`). The introduction of site specification to connects and welds in 3.2.3 conditionally
+  changed the semantics of `mjData.eq_obj1id` and `mjData.eq_obj2id`, but these changes were not properly propagated in
+  several places leading to incorrect computations of constraint inertia, readings of affected force/torque sensors and
+  runtime enabling/disabling of such constraints.
 - Fixed a bug in slider-crank :ref:`transmission<geTransmission>`. The bug was introduced in 3.0.0.
+- Fixed a bug in flex texture coordinates that prevented the correct allocation of textures in mjModel.
+
+
+Documentation
+^^^^^^^^^^^^^
+- Function headers in the :doc:`API reference <../APIreference/APIfunctions>` now link to their source definitions
+  in GitHub.
 
 Version 3.2.4 (Oct 15, 2024)
 ----------------------------
@@ -889,8 +908,8 @@ General
    used to determine the type of the asset file without resorting to pulling the type from the file extension.
 #. Added analytic derivatives for quaternion :ref:`subtraction<mjd_subQuat>` and :ref:`integration<mjd_quatIntegrate>`
    (rotation with an angular velocity). Derivatives are in the 3D tangent space.
-#. Added :ref:`mjv_connector` which has identical functionality to :ref:`mjv_makeConnector`, but with more convenient
-   "from-to" argument parametrization. :ref:`mjv_makeConnector` is now deprecated.
+#. Added :ref:`mjv_connector` which has identical functionality to ``mjv_makeConnector``, but with more convenient
+   "from-to" argument parametrization. ``mjv_makeConnector`` is now deprecated.
 #. Bumped oldest supported MacOS from version 10.12 to 11. MacOS 11 is the oldest version still maintained by Apple.
 
 Python bindings

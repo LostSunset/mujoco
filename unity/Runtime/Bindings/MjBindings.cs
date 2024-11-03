@@ -4851,7 +4851,7 @@ public unsafe struct mjData_ {
   public int nf;
   public int nl;
   public int nefc;
-  public int nnzJ;
+  public int nJ;
   public int nisland;
   public double time;
   public fixed double energy[2];
@@ -5428,7 +5428,7 @@ public unsafe struct mjModel_ {
   public int* flex_shell;
   public int* flex_evpair;
   public double* flex_vert;
-  public double* flex_xvert0;
+  public double* flex_vert0;
   public double* flexedge_length0;
   public double* flexedge_invweight0;
   public double* flex_radius;
@@ -5727,7 +5727,6 @@ public unsafe struct mjsCompiler_ {
   public byte degree;
   public fixed sbyte eulerseq[3];
   public byte discardvisual;
-  public byte convexhull;
   public byte usethread;
   public byte fusestatic;
   public int inertiafromgeom;
@@ -6923,9 +6922,6 @@ public static unsafe extern void mjv_defaultFigure(mjvFigure_* fig);
 public static unsafe extern void mjv_initGeom(mjvGeom_* geom, int type, double* size, double* pos, double* mat, float* rgba);
 
 [DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
-public static unsafe extern void mjv_makeConnector(mjvGeom_* geom, int type, double width, double a0, double a1, double a2, double b0, double b1, double b2);
-
-[DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
 public static unsafe extern void mjv_connector(mjvGeom_* geom, int type, double width, double* from, double* to);
 
 [DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
@@ -7233,6 +7229,9 @@ public static unsafe extern void mju_sqrMatTD(double* res, double* mat, double* 
 
 [DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
 public static unsafe extern void mju_transformSpatial(double* res, double* vec, int flg_force, double* newpos, double* oldpos, double* rotnew2old);
+
+[DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
+public static unsafe extern int mju_dense2sparse(double* res, double* mat, int nr, int nc, int* rownnz, int* rowadr, int* colind, int nnz);
 
 [DllImport("mujoco", CallingConvention = CallingConvention.Cdecl)]
 public static unsafe extern void mju_sparse2dense(double* res, double* mat, int nr, int nc, int* rownnz, int* rowadr, int* colind);

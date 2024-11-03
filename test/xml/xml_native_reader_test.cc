@@ -33,10 +33,6 @@
 namespace mujoco {
 namespace {
 
-std::vector<mjtNum> AsVector(const mjtNum* array, int n) {
-  return std::vector<mjtNum>(array, array + n);
-}
-
 using ::std::string;
 using ::testing::AllOf;
 using ::testing::ElementsAre;
@@ -1685,13 +1681,13 @@ TEST_F(XMLReaderTest, ReadsSkinGroups) {
   <mujoco>
     <worldbody>
       <body>
-        <composite prefix="B0" type="box" count="4 4 4" spacing=".2">
+        <composite prefix="B0" type="grid" count="4 4 1" spacing=".2">
           <geom size=".1" group="2"/>
           <skin group="4"/>
         </composite>
       </body>
       <body>
-        <composite prefix="B1" type="box" count="4 4 4" spacing=".2">
+        <composite prefix="B1" type="grid" count="4 4 1" spacing=".2">
           <geom size=".1" group="4"/>
           <skin group="2"/>
         </composite>
@@ -1702,8 +1698,8 @@ TEST_F(XMLReaderTest, ReadsSkinGroups) {
   std::array<char, 1024> error;
   mjModel* model = LoadModelFromString(xml, error.data(), error.size());
   ASSERT_THAT(model, NotNull());
-  int geomid1 = mj_name2id(model, mjOBJ_GEOM, "B0G0_0_0");
-  int geomid2 = mj_name2id(model, mjOBJ_GEOM, "B1G0_0_0");
+  int geomid1 = mj_name2id(model, mjOBJ_GEOM, "B0G0_0");
+  int geomid2 = mj_name2id(model, mjOBJ_GEOM, "B1G0_0");
   EXPECT_THAT(model->geom_group[geomid1], 2);
   EXPECT_THAT(model->skin_group[0], 4);
   EXPECT_THAT(model->geom_group[geomid2], 4);
@@ -1716,7 +1712,7 @@ TEST_F(XMLReaderTest, InvalidSkinGroup) {
   <mujoco>
     <worldbody>
       <body>
-        <composite prefix="B0" type="box" count="6 6 6" spacing=".2">
+        <composite prefix="B0" type="grid" count="6 6 1" spacing=".2">
           <geom size=".1"/>
           <skin group="6"/>
         </composite>

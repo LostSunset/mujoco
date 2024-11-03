@@ -97,9 +97,9 @@ static void UpdateString(string& psuffix, int count, int i) {
 const char* MJCF[nMJCF][mjXATTRNUM] = {
 {"mujoco", "!", "1", "model"},
 {"<"},
-    {"compiler", "*", "20", "autolimits", "boundmass", "boundinertia", "settotalmass",
+    {"compiler", "*", "19", "autolimits", "boundmass", "boundinertia", "settotalmass",
         "balanceinertia", "strippath", "coordinate", "angle", "fitaabb", "eulerseq",
-        "meshdir", "texturedir", "discardvisual", "convexhull", "usethread",
+        "meshdir", "texturedir", "discardvisual", "usethread",
         "fusestatic", "inertiafromgeom", "inertiagrouprange", "assetdir", "alignfree"},
     {"<"},
         {"lengthrange", "?", "10", "mode", "useexisting", "uselimit",
@@ -742,10 +742,7 @@ const mjMap comp_map[mjNCOMPTYPES] = {
   {"rope",        mjCOMPTYPE_ROPE},
   {"loop",        mjCOMPTYPE_LOOP},
   {"cable",       mjCOMPTYPE_CABLE},
-  {"cloth",       mjCOMPTYPE_CLOTH},
-  {"box",         mjCOMPTYPE_BOX},
-  {"cylinder",    mjCOMPTYPE_CYLINDER},
-  {"ellipsoid",   mjCOMPTYPE_ELLIPSOID}
+  {"cloth",       mjCOMPTYPE_CLOTH}
 };
 
 
@@ -1007,9 +1004,6 @@ void mjXReader::Compiler(XMLElement* section, mjSpec* spec) {
   }
   if (MapValue(section, "discardvisual", &n, bool_map, 2)) {
     spec->compiler.discardvisual = (n==1);
-  }
-  if (MapValue(section, "convexhull", &n, bool_map, 2)) {
-    spec->compiler.convexhull = (n==1);
   }
   if (MapValue(section, "usethread", &n, bool_map, 2)) {
     spec->compiler.usethread = (n==1);
@@ -2386,7 +2380,7 @@ void mjXReader::OneActuator(XMLElement* elem, mjsActuator* actuator) {
 
 
 // make composite
-void mjXReader::OneComposite(XMLElement* elem, mjsBody* body, mjsDefault* def) {
+void mjXReader::OneComposite(XMLElement* elem, mjsBody* body, const mjsDefault* def) {
   string text;
   int n;
 
@@ -3191,7 +3185,7 @@ void mjXReader::Asset(XMLElement* section, const mjVFS* vfs) {
     name = elem->Value();
 
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -3411,7 +3405,7 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
     name = elem->Value();
 
     // get class if specified, otherwise use body
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getDefault(frame ? frame->element : body->element);
     }
@@ -3522,13 +3516,10 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
     // frame sub-element
     else if (name=="frame") {
       // read childdef
-      mjsDefault* childdef = 0;
-      if (ReadAttrTxt(elem, "childclass", text)) {
-        childdef = mjs_findDefault(spec, text.c_str());
-        mjs_findDefault(spec, text.c_str());
-        if (!childdef) {
-          throw mjXError(elem, "unknown default childclass");
-        }
+      bool has_childclass = ReadAttrTxt(elem, "childclass", text);
+      const mjsDefault* childdef = has_childclass ? mjs_findDefault(spec, text.c_str()) : nullptr;
+      if (has_childclass && !childdef) {
+        throw mjXError(elem, "unknown default childclass");
       }
 
       // create frame
@@ -3571,13 +3562,10 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
       mjs_resolveOrientation(rotation, spec->compiler.degree, spec->compiler.eulerseq, &alt);
 
       // read childdef
-      mjsDefault* childdef = 0;
-      if (ReadAttrTxt(elem, "childclass", text)) {
-        childdef = mjs_findDefault(spec, text.c_str());
-        mjs_findDefault(spec, text.c_str());
-        if (!childdef) {
-          throw mjXError(elem, "unknown default childclass");
-        }
+      bool has_childclass = ReadAttrTxt(elem, "childclass", text);
+      const mjsDefault* childdef = has_childclass ? mjs_findDefault(spec, text.c_str()) : nullptr;
+      if (has_childclass && !childdef) {
+        throw mjXError(elem, "unknown default childclass");
       }
 
       // create subtree
@@ -3625,13 +3613,10 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
     // body sub-element
     else if (name=="body") {
       // read childdef
-      mjsDefault* childdef = 0;
-      if (ReadAttrTxt(elem, "childclass", text)) {
-        childdef = mjs_findDefault(spec, text.c_str());
-        mjs_findDefault(spec, text.c_str());
-        if (!childdef) {
-          throw mjXError(elem, "unknown default childclass");
-        }
+      bool has_childclass = ReadAttrTxt(elem, "childclass", text);
+      const mjsDefault* childdef = has_childclass ? mjs_findDefault(spec, text.c_str()) : nullptr;
+      if (has_childclass && !childdef) {
+        throw mjXError(elem, "unknown default childclass");
       }
 
       // create child body
@@ -3723,7 +3708,7 @@ void mjXReader::Contact(XMLElement* section) {
     name = elem->Value();
 
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -3768,7 +3753,7 @@ void mjXReader::Equality(XMLElement* section) {
   elem = FirstChildElement(section);
   while (elem) {
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -3796,7 +3781,7 @@ void mjXReader::Deformable(XMLElement* section, const mjVFS* vfs) {
     name = elem->Value();
 
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -3832,7 +3817,7 @@ void mjXReader::Tendon(XMLElement* section) {
   elem = FirstChildElement(section);
   while (elem) {
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -3898,7 +3883,7 @@ void mjXReader::Actuator(XMLElement* section) {
   elem = FirstChildElement(section);
   while (elem) {
     // get class if specified, otherwise use default0
-    mjsDefault* def = GetClass(elem);
+    const mjsDefault* def = GetClass(elem);
     if (!def) {
       def = mjs_getSpecDefault(spec);
     }
@@ -4309,19 +4294,19 @@ void mjXReader::Keyframe(XMLElement* section) {
 
 
 // get defaults class
-mjsDefault* mjXReader::GetClass(XMLElement* section) {
+const mjsDefault* mjXReader::GetClass(XMLElement* section) {
   string text;
-  mjsDefault* def = nullptr;
 
-  if (ReadAttrTxt(section, "class", text)) {
-    def = mjs_findDefault(spec, text.c_str());
-    if (!def) {
-      throw mjXError(
-          section,
-          string("unknown default class name '" + text + "'").c_str());
-    }
+  if (!ReadAttrTxt(section, "class", text)) {
+    return nullptr;
   }
 
+  const mjsDefault* def = mjs_findDefault(spec, text.c_str());
+  if (!def) {
+    throw mjXError(
+        section,
+        string("unknown default class name '" + text + "'").c_str());
+  }
   return def;
 }
 
