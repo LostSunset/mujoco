@@ -234,12 +234,14 @@ class DynType(enum.IntEnum):
     INTEGRATOR: integrator: da/dt = u
     FILTER: linear filter: da/dt = (u-a) / tau
     FILTEREXACT: linear filter: da/dt = (u-a) / tau, with exact integration
+    MUSCLE: piece-wise linear filter with two time constants
   """
   NONE = mujoco.mjtDyn.mjDYN_NONE
   INTEGRATOR = mujoco.mjtDyn.mjDYN_INTEGRATOR
   FILTER = mujoco.mjtDyn.mjDYN_FILTER
   FILTEREXACT = mujoco.mjtDyn.mjDYN_FILTEREXACT
-  # unsupported: MUSCLE, USER
+  MUSCLE = mujoco.mjtDyn.mjDYN_MUSCLE
+  # unsupported: USER
 
 
 class GainType(enum.IntEnum):
@@ -248,10 +250,12 @@ class GainType(enum.IntEnum):
   Members:
     FIXED: fixed gain
     AFFINE: const + kp*length + kv*velocity
+    MUSCLE: muscle FLV curve computed by muscle_gain
   """
   FIXED = mujoco.mjtGain.mjGAIN_FIXED
   AFFINE = mujoco.mjtGain.mjGAIN_AFFINE
-  # unsupported: MUSCLE, USER
+  MUSCLE = mujoco.mjtGain.mjGAIN_MUSCLE
+  # unsupported: USER
 
 
 class BiasType(enum.IntEnum):
@@ -260,10 +264,12 @@ class BiasType(enum.IntEnum):
   Members:
     NONE: no bias
     AFFINE: const + kp*length + kv*velocity
+    MUSCLE: muscle passive force computed by muscle_bias
   """
   NONE = mujoco.mjtBias.mjBIAS_NONE
   AFFINE = mujoco.mjtBias.mjBIAS_AFFINE
-  # unsupported: MUSCLE, USER
+  MUSCLE = mujoco.mjtBias.mjBIAS_MUSCLE
+  # unsupported: USER
 
 
 class ConstraintType(enum.IntEnum):
@@ -940,7 +946,7 @@ class Model(PyTreeNode):
   geom_margin: jax.Array
   geom_gap: jax.Array
   geom_fluid: np.ndarray
-  geom_rgba: np.ndarray
+  geom_rgba: jax.Array
   site_type: np.ndarray
   site_bodyid: np.ndarray
   site_sameframe: np.ndarray
@@ -1034,7 +1040,7 @@ class Model(PyTreeNode):
   tex_nchannel: np.ndarray
   tex_adr: np.ndarray
   tex_data: jax.Array
-  mat_rgba: np.ndarray
+  mat_rgba: jax.Array
   mat_texid: np.ndarray
   pair_dim: np.ndarray
   pair_geom1: np.ndarray
