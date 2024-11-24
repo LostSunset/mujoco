@@ -263,8 +263,8 @@ struct mjData_ {
   mjtNum* actuator_length;   // actuator lengths                                 (nu x 1)
   int*    moment_rownnz;     // number of non-zeros in actuator_moment row       (nu x 1)
   int*    moment_rowadr;     // row start address in colind array                (nu x 1)
-  int*    moment_colind;     // column indices in sparse Jacobian                (nu x nv)
-  mjtNum* actuator_moment;   // actuator moments                                 (nu x nv)
+  int*    moment_colind;     // column indices in sparse Jacobian                (nJmom x 1)
+  mjtNum* actuator_moment;   // actuator moments                                 (nJmom x 1)
 
   // computed by mj_fwdPosition/mj_crb
   mjtNum* crb;               // com-based composite inertia and mass             (nbody x 10)
@@ -956,6 +956,7 @@ struct mjModel_ {
   int nB;                         // number of non-zeros in sparse body-dof matrix
   int nC;                         // number of non-zeros in sparse reduced dof-dof matrix
   int nD;                         // number of non-zeros in sparse dof-dof matrix
+  int nJmom;                      // number of non-zeros in sparse actuator_moment matrix
   int ntree;                      // number of kinematic trees under world body
   int ngravcomp;                  // number of bodies with nonzero gravcomp
   int nemax;                      // number of potential equality-constraint rows
@@ -1582,14 +1583,14 @@ struct mjrContext_ {                // custom OpenGL context
   unsigned int auxColor_r[mjNAUX];  // auxiliary color buffer for resolving
 
   // materials with textures
-  int mat_texid[mjMAXMATERIAL*mjNTEXROLE];       // material texture ids (-1: no texture)
-  int mat_texuniform[mjMAXMATERIAL];            // texture repetition for 2d mapping
-  int mat_texrepeat[mjMAXMATERIAL*2];           // texture repetition for 2d mapping
+  int mat_texid[mjMAXMATERIAL*mjNTEXROLE]; // material texture ids (-1: no texture)
+  int mat_texuniform[mjMAXMATERIAL];       // uniform cube mapping
+  float mat_texrepeat[mjMAXMATERIAL*2];    // texture repetition for 2d mapping
 
   // texture objects and info
-  int ntexture;                        // number of allocated textures
-  int textureType[mjMAXTEXTURE];       // type of texture (mjtTexture) (ntexture)
-  unsigned int texture[mjMAXTEXTURE];  // texture names
+  int ntexture;                            // number of allocated textures
+  int textureType[mjMAXTEXTURE];           // type of texture (mjtTexture) (ntexture)
+  unsigned int texture[mjMAXTEXTURE];      // texture names
 
   // displaylist starting positions
   unsigned int basePlane;           // all planes from model
@@ -1628,13 +1629,13 @@ struct mjrContext_ {                // custom OpenGL context
   int windowDoublebuffer;           // is default/window framebuffer double buffered
 
   // framebuffer
-  int     currentBuffer;            // currently active framebuffer: mjFB_WINDOW or mjFB_OFFSCREEN
+  int currentBuffer;                // currently active framebuffer: mjFB_WINDOW or mjFB_OFFSCREEN
 
   // pixel output format
-  int     readPixelFormat;          // default color pixel format for mjr_readPixels
+  int readPixelFormat;              // default color pixel format for mjr_readPixels
 
   // depth output format
-  int     readDepthMap;             // depth mapping: mjDEPTH_ZERONEAR or mjDEPTH_ZEROFAR
+  int readDepthMap;                 // depth mapping: mjDEPTH_ZERONEAR or mjDEPTH_ZEROFAR
 };
 typedef struct mjrContext_ mjrContext;
 typedef enum mjtGeomInertia_ {     // type of inertia inference
@@ -2002,7 +2003,6 @@ typedef struct mjsMesh_ {          // mesh specification
   mjFloatVec* usernormal;          // user normal data
   mjFloatVec* usertexcoord;        // user texcoord data
   mjIntVec* userface;              // user vertex indices
-  mjIntVec* userfacenormal;        // user normal indices
   mjIntVec* userfacetexcoord;      // user texcoord indices
   mjsPlugin plugin;                // sdf plugin
   mjString* info;                  // message appended to compiler errors
@@ -3347,6 +3347,7 @@ void mjv_updateScene(const mjModel* m, mjData* d, const mjvOption* opt,
 int mjv_updateSceneFromState(const mjvSceneState* scnstate, const mjvOption* opt,
                              const mjvPerturb* pert, mjvCamera* cam, int catmask,
                              mjvScene* scn);
+void mjv_copyModel(mjModel* dest, const mjModel* src);
 void mjv_defaultSceneState(mjvSceneState* scnstate);
 void mjv_makeSceneState(const mjModel* m, const mjData* d,
                         mjvSceneState* scnstate, int maxgeom);

@@ -118,6 +118,7 @@ class mjCModel_ : public mjsElement {
   int nB;              // number of non-zeros in sparse body-dof matrix
   int nC;              // number of non-zeros in reduced sparse dof-dof matrix
   int nD;              // number of non-zeros in sparse dof-dof matrix
+  int nJmom;           // number of non-zeros in sparse actuator_moment matrix
 
   // statistics, as computed by mj_setConst
   double meaninertia_auto;  // mean diagonal inertia, as computed by mj_setConst
@@ -322,6 +323,8 @@ class mjCModel : public mjCModel_, private mjSpec {
   void CopyPaths(mjModel*);             // copy paths, compute path addresses
   void CopyObjects(mjModel*);           // copy objects outside kinematic tree
   void CopyTree(mjModel*);              // copy objects inside kinematic tree
+  void CopyPlugins(mjModel*);           // copy plugin data
+  int CountNJmom(const mjModel* m);     // compute number of non-zeros in actuator_moment matrix
 
   // objects created here
   std::vector<mjCFlex*>     flexes_;      // list of flexes
