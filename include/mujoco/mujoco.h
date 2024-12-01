@@ -117,7 +117,8 @@ MJAPI int mj_saveLastXML(const char* filename, const mjModel* m, char* error, in
 // Free last XML model if loaded. Called internally at each load.
 MJAPI void mj_freeLastXML(void);
 
-// Save spec to XML string, return 1 on success, 0 otherwise.
+// Save spec to XML string, return 0 on success, -1 on failure.
+// If length of the output buffer is too small, returns the required size.
 MJAPI int mj_saveXMLString(const mjSpec* s, char* xml, int xml_sz, char* error, int error_sz);
 
 // Save spec to XML file, return 1 on success, 0 otherwise.
@@ -1119,6 +1120,10 @@ MJAPI void mju_quatIntegrate(mjtNum quat[4], const mjtNum vel[3], mjtNum scale);
 
 // Construct quaternion performing rotation from z-axis to given vector.
 MJAPI void mju_quatZ2Vec(mjtNum quat[4], const mjtNum vec[3]);
+
+// extract 3D rotation from an arbitrary 3x3 matrix by refining the input quaternion
+// returns the number of iterations required to converge
+MJAPI int mju_mat2Rot(mjtNum quat[4], const mjtNum mat[9]);
 
 // Convert sequence of Euler angles (radians) to quaternion.
 // seq[0,1,2] must be in 'xyzXYZ', lower/upper-case mean intrinsic/extrinsic rotations.

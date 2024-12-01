@@ -182,6 +182,11 @@ mjCModel& mjCModel::operator=(const mjCModel& other) {
     *static_cast<mjCModel_*>(this) = static_cast<const mjCModel_&>(other);
     *static_cast<mjSpec*>(this) = static_cast<const mjSpec&>(other);
 
+    // copy attached specs first so that we can resolve references to them
+    for (const auto* s : other.specs_) {
+      specs_.push_back(mj_copySpec(s));
+    }
+
     // the world copy constructor takes care of copying the tree
     mjCBody* world = new mjCBody(*other.bodies_[0], this);
     bodies_.push_back(world);
@@ -398,9 +403,6 @@ mjCModel& mjCModel::operator+=(const mjCModel& other) {
     }
     CopyList(numerics_, other.numerics_);
     CopyList(texts_, other.texts_);
-    for (const auto* s : other.specs_) {
-      specs_.push_back(mj_copySpec(s));
-    }
   }
   CopyList(flexes_, other.flexes_);
   CopyList(pairs_, other.pairs_);
@@ -2824,6 +2826,9 @@ void mjCModel::CopyObjects(mjModel* m) {
     else {
       mjuu_copyvec(m->flex_vert + 3*vert_adr, pfl->vert_.data(), 3*pfl->nvert);
     }
+
+    // copy vert0
+    mjuu_copyvec(m->flex_vert0 + 3*vert_adr, pfl->vert0_.data(), 3*pfl->nvert);
 
     // copy or set vertbodyid
     if (pfl->rigid) {

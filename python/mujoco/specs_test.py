@@ -94,9 +94,12 @@ class SpecsTest(absltest.TestCase):
 
     # Compile the spec and check for expected values in the model.
     model = spec.compile()
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
     self.assertEqual(model.nbody, 2)  # 2 bodies, including the world body
-    np.testing.assert_array_equal(model.body('baz').pos, [1, 2, 3])
-    np.testing.assert_array_equal(model.body('baz').quat, [0, 1, 0, 0])
+    np.testing.assert_array_equal(model.bind(body).pos, [1, 2, 3])
+    np.testing.assert_array_equal(model.bind(body).quat, [0, 1, 0, 0])
+    np.testing.assert_array_equal(data.bind(body).xpos, [1, 2, 3])
     self.assertEqual(model.nsite, 1)
     self.assertEqual(model.nuser_site, 6)
     np.testing.assert_array_equal(model.site_user[0], [1, 2, 3, 4, 5, 6])
@@ -883,6 +886,19 @@ class SpecsTest(absltest.TestCase):
     spec.compile()
     frame = body.to_frame()
     np.testing.assert_array_equal(frame.pos, [1, 2, 3])
+
+  def test_attach_spec_to_frame(self):
+    child = mujoco.MjSpec()
+    child.worldbody.add_camera(name='camera')
+    parent = mujoco.MjSpec()
+    frame = parent.worldbody.add_frame(name='frame')
+    frame.attach(child, 'child-', '')
+    self.assertLen(child.cameras, 1)
+    self.assertLen(parent.bodies, 1)
+    self.assertLen(parent.frames, 2)
+    self.assertEqual(parent.cameras[0].name, 'child-camera')
+    self.assertEqual(parent.frames[0].name, 'frame')
+    self.assertEqual(parent.frames[1].name, '')
 
 
 if __name__ == '__main__':

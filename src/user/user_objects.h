@@ -615,6 +615,7 @@ class mjCSite : public mjCSite_, private mjsSite {
   void Compile(void);                     // compiler
   void CopyFromSpec();                    // copy spec into attributes
   void PointToLocal(void);
+  void NameSpace(const mjCModel* m);
 };
 
 
@@ -773,6 +774,8 @@ class mjCFlex: public mjCFlex_, private mjsFlex {
   void Compile(const mjVFS* vfs);         // compiler
   void CreateBVH(void);                   // create flex BVH
   void CreateShellPair(void);             // create shells and evpairs
+
+  std::vector<double> vert0_;             // vertex positions in [0, 1]^d in the bounding box
 };
 
 
