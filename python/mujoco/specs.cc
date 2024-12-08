@@ -345,6 +345,26 @@ PYBIND11_MODULE(_specs, m) {
       },
       py::return_value_policy::reference_internal);
   mjSpec.def(
+      "find_site",
+      [](MjSpec& self, std::string& name) -> raw::MjsSite* {
+        return mjs_asSite(mjs_findElement(self.ptr, mjOBJ_SITE, name.c_str()));
+      },
+      py::return_value_policy::reference_internal);
+  mjSpec.def(
+      "find_actuator",
+      [](MjSpec& self, std::string& name) -> raw::MjsActuator* {
+        return mjs_asActuator(
+            mjs_findElement(self.ptr, mjOBJ_ACTUATOR, name.c_str()));
+      },
+      py::return_value_policy::reference_internal);
+  mjSpec.def(
+      "find_sensor",
+      [](MjSpec& self, std::string& name) -> raw::MjsSensor* {
+        return mjs_asSensor(
+            mjs_findElement(self.ptr, mjOBJ_SENSOR, name.c_str()));
+      },
+      py::return_value_policy::reference_internal);
+  mjSpec.def(
       "find_default",
       [](MjSpec& self, std::string& classname) -> const raw::MjsDefault* {
         return mjs_findDefault(self.ptr, classname.c_str());
@@ -473,6 +493,8 @@ PYBIND11_MODULE(_specs, m) {
           objtype = mjOBJ_GEOM;
         } else if (name == "site") {
           objtype = mjOBJ_SITE;
+        } else if (name == "joint") {
+          objtype = mjOBJ_JOINT;
         } else if (name == "light") {
           objtype = mjOBJ_LIGHT;
         } else if (name == "camera") {
@@ -480,7 +502,7 @@ PYBIND11_MODULE(_specs, m) {
         } else {
           throw pybind11::value_error(
               "body.find_all supports the types: body, frame, geom, site, "
-              "light, camera.");
+              "joint, light, camera.");
         }
         return FindAllImpl(self, objtype, true);
       },
@@ -625,15 +647,19 @@ PYBIND11_MODULE(_specs, m) {
       py::return_value_policy::reference_internal);
   mjsBody.def(
       "attach_frame",
-      [](raw::MjsBody& self, raw::MjsFrame& frame, std::string& prefix,
-         std::string& suffix) -> raw::MjsFrame* {
-        auto new_frame =
-            mjs_attachFrame(&self, &frame, prefix.c_str(), suffix.c_str());
+      [](raw::MjsBody& self, raw::MjsFrame& frame,
+         std::optional<std::string>& prefix,
+         std::optional<std::string>& suffix) -> raw::MjsFrame* {
+        const char* p = prefix.has_value() ? prefix.value().c_str() : "";
+        const char* s = suffix.has_value() ? suffix.value().c_str() : "";
+        auto new_frame = mjs_attachFrame(&self, &frame, p, s);
         if (!new_frame) {
           throw pybind11::value_error(mjs_getError(mjs_getSpec(self.element)));
         }
         return new_frame;
       },
+      py::arg("frame"), py::arg("prefix") = py::none(),
+      py::arg("suffix") = py::none(),
       py::return_value_policy::reference_internal);
   mjsBody.def(
     "to_frame",
@@ -654,34 +680,41 @@ PYBIND11_MODULE(_specs, m) {
   });
   mjsFrame.def(
       "attach_body",
-      [](raw::MjsFrame& self, raw::MjsBody& body, std::string& prefix,
-         std::string& suffix) -> raw::MjsBody* {
-        auto new_body =
-            mjs_attachBody(&self, &body, prefix.c_str(), suffix.c_str());
+      [](raw::MjsFrame& self, raw::MjsBody& body,
+         std::optional<std::string>& prefix,
+         std::optional<std::string>& suffix) -> raw::MjsBody* {
+        const char* p = prefix.has_value() ? prefix.value().c_str() : "";
+        const char* s = suffix.has_value() ? suffix.value().c_str() : "";
+        auto new_body = mjs_attachBody(&self, &body, p, s);
         if (!new_body) {
           throw pybind11::value_error(
               mjs_getError(mjs_getSpec(self.element)));
         }
         return new_body;
       },
+      py::arg("body"), py::arg("prefix") = py::none(),
+      py::arg("suffix") = py::none(),
       py::return_value_policy::reference_internal);
   mjsFrame.def(
       "attach",
-      [](raw::MjsFrame& self, MjSpec& spec, std::string& prefix,
-         std::string& suffix) -> raw::MjsFrame* {
+      [](raw::MjsFrame& self, MjSpec& spec, std::optional<std::string>& prefix,
+         std::optional<std::string>& suffix) -> raw::MjsFrame* {
         auto world = mjs_findBody(spec.ptr, "world");
         if (!world) {
           throw pybind11::value_error(
               mjs_getError(mjs_getSpec(self.element)));
         }
-        auto attached_world =
-            mjs_attachBody(&self, world, prefix.c_str(), suffix.c_str());
+        const char* p = prefix.has_value() ? prefix.value().c_str() : "";
+        const char* s = suffix.has_value() ? suffix.value().c_str() : "";
+        auto attached_world = mjs_attachBody(&self, world, p, s);
         if (!attached_world) {
           throw pybind11::value_error(
               mjs_getError(mjs_getSpec(self.element)));
         }
         return mjs_bodyToFrame(&attached_world);
       },
+      py::arg("spec"), py::arg("prefix") = py::none(),
+      py::arg("suffix") = py::none(),
       py::return_value_policy::reference_internal);
 
   // ============================= MJSGEOM =====================================
@@ -729,17 +762,43 @@ PYBIND11_MODULE(_specs, m) {
       },
       py::return_value_policy::reference_internal);
   mjsSite.def(
-      "attach",
-      [](raw::MjsSite& self, raw::MjsBody& body, std::string& prefix,
-         std::string& suffix) -> raw::MjsBody* {
-        auto new_body =
-            mjs_attachToSite(&self, &body, prefix.c_str(), suffix.c_str());
+      "attach_body",
+      [](raw::MjsSite& self, raw::MjsBody& body,
+         std::optional<std::string>& prefix,
+         std::optional<std::string>& suffix) -> raw::MjsBody* {
+        const char* p = prefix.has_value() ? prefix.value().c_str() : "";
+        const char* s = suffix.has_value() ? suffix.value().c_str() : "";
+        auto new_body = mjs_attachToSite(&self, &body, p, s);
         if (!new_body) {
           throw pybind11::value_error(
               mjs_getError(mjs_getSpec(self.element)));
         }
         return new_body;
       },
+      py::arg("body"), py::arg("prefix") = py::none(),
+      py::arg("suffix") = py::none(),
+      py::return_value_policy::reference_internal);
+  mjsSite.def(
+      "attach",
+      [](raw::MjsSite& self, MjSpec& spec,
+         std::optional<std::string>& prefix,
+         std::optional<std::string>& suffix) -> raw::MjsFrame* {
+        auto world = mjs_findBody(spec.ptr, "world");
+        if (!world) {
+          throw pybind11::value_error(
+              mjs_getError(mjs_getSpec(self.element)));
+        }
+        const char* p = prefix.has_value() ? prefix.value().c_str() : "";
+        const char* s = suffix.has_value() ? suffix.value().c_str() : "";
+        auto attached_world = mjs_attachToSite(&self, world, p, s);
+        if (!attached_world) {
+          throw pybind11::value_error(
+              mjs_getError(mjs_getSpec(self.element)));
+        }
+        return mjs_bodyToFrame(&attached_world);
+      },
+      py::arg("body"), py::arg("prefix") = py::none(),
+      py::arg("suffix") = py::none(),
       py::return_value_policy::reference_internal);
 
   // ============================= MJSCAMERA ===================================

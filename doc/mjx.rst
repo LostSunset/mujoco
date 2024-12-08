@@ -7,7 +7,7 @@ MuJoCo XLA (MJX)
 Starting with version 3.0.0, MuJoCo includes MuJoCo XLA (MJX) under the
 `mjx <https://github.com/google-deepmind/mujoco/tree/main/mjx>`__ directory.  MJX allows MuJoCo to run on compute
 hardware supported by the `XLA <https://www.tensorflow.org/xla>`__ compiler via the
-`JAX <https://github.com/google/jax#readme>`__ framework.  MJX runs on a
+`JAX <https://github.com/jax-ml/jax#readme>`__ framework.  MJX runs on a
 `all platforms supported by JAX <https://jax.readthedocs.io/en/latest/installation.html#supported-platforms>`__: Nvidia
 and AMD GPUs, Apple Silicon, and `Google Cloud TPUs <https://cloud.google.com/tpu>`__.
 
@@ -244,8 +244,10 @@ The following features are **fully supported** in MJX:
      - ``MAGNETOMETER``, ``CAMPROJECTION``, ``RANGEFINDER``, ``JOINTPOS``, ``TENDONPOS``, ``ACTUATORPOS``, ``BALLQUAT``,
        ``FRAMEPOS``, ``FRAMEXAXIS``, ``FRAMEYAXIS``, ``FRAMEZAXIS``, ``FRAMEQUAT``, ``SUBTREECOM``, ``CLOCK``,
        ``VELOCIMETER``, ``GYRO``, ``JOINTVEL``, ``TENDONVEL``, ``ACTUATORVEL``, ``BALLANGVEL``, ``FRAMELINVEL``,
-       ``FRAMEANGVEL``, ``SUBTREELINVEL``, ``SUBTREEANGMOM``, ``TOUCH``, ``ACCELEROMETER``, ``FORCE``, ``TORQUE``,
-       ``ACTUATORFRC``, ``JOINTACTFRC``, ``FRAMELINACC``, ``FRAMEANGACC``.
+       ``FRAMEANGVEL``, ``SUBTREELINVEL``, ``SUBTREEANGMOM``, ``TOUCH``, ``ACTUATORFRC``, ``JOINTACTFRC``,
+       ``FRAMELINACC``, ``FRAMEANGACC``
+     - ``ACCELEROMETER``, ``FORCE``, and ``TORQUE`` are supported if the model does not include connect or weld equality
+       constraints.
 
 The following features are **in development** and coming soon:
 
@@ -274,6 +276,9 @@ The following features are **in development** and coming soon:
      - All except ``PLUGIN``, ``USER``
    * - Lights
      - Positions and directions of lights
+   * - :ref:`Sensors <mjtSensor>`
+     - ``ACCELEROMETER``, ``FORCE``, and ``TORQUE`` for models that include connect or weld equality
+     constraints.
 
 The following features are **unsupported**:
 
@@ -411,4 +416,4 @@ The following environment variables should be set:
 ``XLA_FLAGS=--xla_gpu_triton_gemm_any=true``
   This enables the Triton-based GEMM (matmul) emitter for any GEMM that it supports.  This can yield a 30% speedup on
   NVIDIA GPUs.  If you have multiple GPUs, you may also benefit from enabling flags related to
-  `communciation between GPUs <https://jax.readthedocs.io/en/latest/gpu_performance_tips.html>`__.
+  `communication between GPUs <https://jax.readthedocs.io/en/latest/gpu_performance_tips.html>`__.

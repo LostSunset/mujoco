@@ -142,6 +142,21 @@ def put_model(
           ' implemented for spatial tendons.'
       )
 
+  # check for unsupported sensor and equality constraint combinations
+  sensor_rne_postconstraint = (
+      np.any(m.sensor_type == types.SensorType.ACCELEROMETER)
+      | np.any(m.sensor_type == types.SensorType.FORCE)
+      | np.any(m.sensor_type == types.SensorType.TORQUE)
+  )
+  eq_connect_weld = np.any(m.eq_type == types.EqType.CONNECT) | np.any(
+      m.eq_type == types.EqType.WELD
+  )
+  if sensor_rne_postconstraint and eq_connect_weld:
+    raise NotImplementedError(
+        'rne_postconstraint not implemented with equality constraints:'
+        ' connect, weld.'
+    )
+
   for enum_field, enum_type, mj_type in (
       (m.actuator_biastype, types.BiasType, mujoco.mjtBias),
       (m.actuator_dyntype, types.DynType, mujoco.mjtDyn),
@@ -218,9 +233,11 @@ def make_data(
         solreffriction=jp.zeros((ncon, mujoco.mjNREF), dtype=float),
         solimp=jp.zeros((ncon, mujoco.mjNIMP), dtype=float),
         dim=dim,
-        geom1=jp.full((ncon,), -1, dtype=jp.int32),
-        geom2=jp.full((ncon,), -1, dtype=jp.int32),
-        geom=jp.full((ncon, 2), -1, dtype=jp.int32),
+        # let jax pick contact.geom int precision, for interop with
+        # jax_enable_x64
+        geom1=jp.full((ncon,), -1, dtype=int),
+        geom2=jp.full((ncon,), -1, dtype=int),
+        geom=jp.full((ncon, 2), -1, dtype=int),
         efc_address=efc_address,
     )
 
@@ -305,12 +322,18 @@ def make_data(
         'subtree_angmom': (m.nbody, 3, float),
         'qH': (m.nM, float) if support.is_sparse(m) else (m.nv, m.nv, float),
         'qHDiagInv': (m.nv, float),
-        'D_rownnz': (m.nv, jp.int32),
-        'D_rowadr': (m.nv, jp.int32),
-        'D_colind': (m.nD, jp.int32),
         'B_rownnz': (m.nbody, jp.int32),
         'B_rowadr': (m.nbody, jp.int32),
         'B_colind': (m.nB, jp.int32),
+        'C_rownnz': (m.nv, jp.int32),
+        'C_rowadr': (m.nv, jp.int32),
+        'C_colind': (m.nC, jp.int32),
+        'mapM2C': (m.nC, jp.int32),
+        'D_rownnz': (m.nv, jp.int32),
+        'D_rowadr': (m.nv, jp.int32),
+        'D_colind': (m.nD, jp.int32),
+        'mapM2D': (m.nD, jp.int32),
+        'mapD2M': (m.nM, jp.int32),
         'qDeriv': (m.nD, float),
         'qLU': (m.nD, float),
         'actuator_force': (m.nu, float),
