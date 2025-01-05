@@ -5214,14 +5214,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  array_extent=('nv',),
              ),
              StructFieldDecl(
-                 name='qLDiagSqrtInv',
-                 type=PointerType(
-                     inner_type=ValueType(name='mjtNum'),
-                 ),
-                 doc='1/sqrt(diag(D))',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
                  name='bvh_aabb_dyn',
                  type=PointerType(
                      inner_type=ValueType(name='mjtNum'),
@@ -12380,7 +12372,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
              StructFieldDecl(
                  name='height',
                  type=ValueType(name='int'),
-                 doc='current heigth',
+                 doc='current height',
              ),
              StructFieldDecl(
                  name='maxheight',

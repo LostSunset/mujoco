@@ -774,7 +774,7 @@ void mj_tendon(const mjModel* m, mjData* d) {
         L[i] += (mju_dist3(wpnt, wpnt+3) + wlen + mju_dist3(wpnt+6, wpnt+9))/divisor;
       }
 
-      // accumulate moments if consequtive points are in different bodies
+      // accumulate moments if consecutive points are in different bodies
       for (int k=0; k < (wlen < 0 ? 1 : 3); k++) {
         if (wbody[k] != wbody[k+1]) {
           // get 3D position difference, normalize
@@ -1387,8 +1387,7 @@ void mj_crb(const mjModel* m, mjData* d) {
 
 
 // sparse L'*D*L factorizaton of inertia-like matrix M, assumed spd
-void mj_factorI(const mjModel* m, mjData* d, const mjtNum* M, mjtNum* qLD, mjtNum* qLDiagInv,
-                mjtNum* qLDiagSqrtInv) {
+void mj_factorI(const mjModel* m, mjData* d, const mjtNum* M, mjtNum* qLD, mjtNum* qLDiagInv) {
   int cnt;
   int Madr_kk, Madr_ki;
   mjtNum tmp;
@@ -1445,9 +1444,6 @@ void mj_factorI(const mjModel* m, mjData* d, const mjtNum* M, mjtNum* qLD, mjtNu
   for (int i=0; i < nv; i++) {
     mjtNum qLDi = qLD[dof_Madr[i]];
     qLDiagInv[i] = 1.0/qLDi;
-    if (qLDiagSqrtInv) {
-      qLDiagSqrtInv[i] = 1.0/mju_sqrt(qLDi);
-    }
   }
 }
 
@@ -1456,7 +1452,7 @@ void mj_factorI(const mjModel* m, mjData* d, const mjtNum* M, mjtNum* qLD, mjtNu
 // sparse L'*D*L factorizaton of the inertia matrix M, assumed spd
 void mj_factorM(const mjModel* m, mjData* d) {
   TM_START;
-  mj_factorI(m, d, d->qM, d->qLD, d->qLDiagInv, d->qLDiagSqrtInv);
+  mj_factorI(m, d, d->qM, d->qLD, d->qLDiagInv);
   TM_ADD(mjTIMER_POS_INERTIA);
 }
 
@@ -1579,14 +1575,21 @@ void mj_solveLD(const mjModel* m, mjtNum* restrict x, int n,
 // in-place sparse backsubstitution:  x = inv(L'*D*L)*x
 //  like mj_solveLD, but using the CSR representation of L
 void mj_solveLDs(mjtNum* restrict x, const mjtNum* qLDs, const mjtNum* qLDiagInv, int nv,
-                 const int* rownnz, const int* rowadr, const int* diag, const int* colind) {
+                 const int* rownnz, const int* rowadr, const int* diagind, const int* diagnum,
+                 const int* colind) {
   // x <- L^-T x
-  for (int i=nv-2; i >= 0; i--) {
-    int d1 = diag[i] + 1;
-    int nnz = rownnz[i] - d1;
-    if (nnz > 0) {
-      int adr = rowadr[i] + d1;
-      x[i] -= mju_dotSparse(qLDs+adr, x, nnz, colind+adr, /*flg_unc1=*/0);
+  for (int i=nv-1; i > 0; i--) {
+    // skip diagonal (simple) rows, exploit sparsity of input vector
+    if (diagnum[i] || x[i] == 0) {
+      continue;
+    }
+
+    int d = diagind[i];
+    int adr_i = rowadr[i];
+    mjtNum x_i = x[i];
+    for (int j=0; j < d; j++) {
+      int adr = adr_i + j;
+      x[colind[adr]] -= qLDs[adr] * x_i;
     }
   }
 
@@ -1597,11 +1600,14 @@ void mj_solveLDs(mjtNum* restrict x, const mjtNum* qLDs, const mjtNum* qLDiagInv
 
   // x <- L^-1 x
   for (int i=1; i < nv; i++) {
-    int d = diag[i];
-    if (d > 0) {
-      int adr = rowadr[i];
-      x[i] -= mju_dotSparse(qLDs+adr, x, d, colind+adr, /*flg_unc1=*/0);
+    // skip diagonal (simple) rows
+    if (diagnum[i]) {
+      i += diagnum[i] - 1;  // when iterating forward we can skip ahead
+      continue;
     }
+
+    int adr = rowadr[i];
+    x[i] -= mju_dotSparse(qLDs+adr, x, diagind[i], colind+adr, /*flg_unc1=*/0);
   }
 }
 
@@ -1685,10 +1691,10 @@ void mj_solveM_island(const mjModel* m, const mjData* d, mjtNum* restrict x, int
 
 
 // half of sparse backsubstitution:  x = sqrt(inv(D))*inv(L')*y
-void mj_solveM2(const mjModel* m, mjData* d, mjtNum* x, const mjtNum* y, int n) {
+void mj_solveM2(const mjModel* m, mjData* d, mjtNum* x, const mjtNum* y,
+                const mjtNum* sqrtInvD, int n) {
   // local copies of key variables
   mjtNum* qLD = d->qLD;
-  mjtNum* qLDiagSqrtInv = d->qLDiagSqrtInv;
   int* dof_Madr = m->dof_Madr;
   int* dof_parentid = m->dof_parentid;
   int nv = m->nv;
@@ -1720,7 +1726,7 @@ void mj_solveM2(const mjModel* m, mjData* d, mjtNum* x, const mjtNum* y, int n) 
 
     // x <- sqrt(inv(D)) * x
     for (int i=0; i < nv; i++) {
-      x[i+offset] *= qLDiagSqrtInv[i];  // x(i) /= sqrt(L(i,i))
+      x[i+offset] *= sqrtInvD[i];  // x(i) /= sqrt(L(i,i))
     }
   }
 }
@@ -1781,7 +1787,7 @@ void mj_comVel(const mjModel* m, mjData* d) {
 
       default:
         // in principle we should use the new velocity to compute cdofdot,
-        // but it makes no difference becase crossMotion(cdof, cdof) = 0,
+        // but it makes no difference because crossMotion(cdof, cdof) = 0,
         // and using the old velocity may be more accurate numerically
         mju_crossMotion(cdofdot+6*j, cvel, d->cdof+6*(bda+j));
 
