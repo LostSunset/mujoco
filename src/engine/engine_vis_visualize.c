@@ -1728,7 +1728,7 @@ void mjv_addGeoms(const mjModel* m, mjData* d, const mjvOption* vopt,
   // spatial tendons
   objtype = mjOBJ_TENDON;
   category = mjCAT_DYNAMIC;
-  if (vopt->flags[mjVIS_TENDON] && (category & catmask)) {
+  if (vopt->flags[mjVIS_TENDON] && (category & catmask) && m->ntendon) {
     // mark actuated tendons
     mj_markStack(d);
     int* tendon_actuated = mjSTACKALLOC(d, m->ntendon, int);
@@ -1837,7 +1837,7 @@ void mjv_addGeoms(const mjModel* m, mjData* d, const mjvOption* vopt,
           for (int j=0; j < npoints-1; j++) {
             START
 
-              sz[0] = m->tendon_width[i];
+            sz[0] = m->tendon_width[i];
 
             // construct geom
             mjv_connector(thisgeom, mjGEOM_CAPSULE, sz[0], catenary+3*j, catenary+3*j+3);

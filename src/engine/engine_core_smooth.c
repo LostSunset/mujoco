@@ -1440,10 +1440,9 @@ void mj_factorI(const mjModel* m, mjData* d, const mjtNum* M, mjtNum* qLD, mjtNu
     }
   }
 
-  // compute 1/diag(D), 1/sqrt(diag(D))
+  // compute 1/diag(D)
   for (int i=0; i < nv; i++) {
-    mjtNum qLDi = qLD[dof_Madr[i]];
-    qLDiagInv[i] = 1.0/qLDi;
+    qLDiagInv[i] = 1.0 / qLD[dof_Madr[i]];
   }
 }
 
@@ -1454,6 +1453,40 @@ void mj_factorM(const mjModel* m, mjData* d) {
   TM_START;
   mj_factorI(m, d, d->qM, d->qLD, d->qLDiagInv);
   TM_ADD(mjTIMER_POS_INERTIA);
+}
+
+
+
+// sparse L'*D*L factorizaton of inertia-like matrix M, assumed spd
+//  like mj_factorI, but using CSR representation
+void mj_factorIs(mjtNum* mat, mjtNum* diaginv, int nv,
+                 const int* rownnz, const int* rowadr, const int* diagnum, const int* colind) {
+  // backward loop over rows
+  for (int k=nv-1; k >= 0; k--) {
+    // get row k's address, diagonal index, inverse diagonal value
+    int rowadr_k = rowadr[k];
+    int diag_k = rowadr_k + rownnz[k] - 1;
+    mjtNum invD = 1 / mat[diag_k];
+    if (diaginv) diaginv[k] = invD;
+
+    // skip if simple
+    if (diagnum[k]) {
+      continue;
+    }
+
+    // update triangle above row k, inclusive
+    for (int adr=diag_k - 1; adr >= rowadr_k; adr--) {
+      // tmp = L(k, i) / L(k, k)
+      mjtNum tmp = mat[adr] * invD;
+
+      // update row i < k:  L(i, 0..i) -= L(i, 0..i) * L(k, i) / L(k, k)
+      int i = colind[adr];
+      mju_addToScl(mat + rowadr[i], mat + rowadr_k, -tmp, rownnz[i]);
+
+      // update ith element of row k:  L(k, i) /= L(k, k)
+      mat[adr] = tmp;
+    }
+  }
 }
 
 
@@ -1574,40 +1607,88 @@ void mj_solveLD(const mjModel* m, mjtNum* restrict x, int n,
 
 // in-place sparse backsubstitution:  x = inv(L'*D*L)*x
 //  like mj_solveLD, but using the CSR representation of L
-void mj_solveLDs(mjtNum* restrict x, const mjtNum* qLDs, const mjtNum* qLDiagInv, int nv,
-                 const int* rownnz, const int* rowadr, const int* diagind, const int* diagnum,
-                 const int* colind) {
-  // x <- L^-T x
-  for (int i=nv-1; i > 0; i--) {
-    // skip diagonal (simple) rows, exploit sparsity of input vector
-    if (diagnum[i] || x[i] == 0) {
-      continue;
+void mj_solveLDs(mjtNum* restrict x, const mjtNum* qLDs, const mjtNum* qLDiagInv, int nv, int n,
+                 const int* rownnz, const int* rowadr, const int* diagnum, const int* colind) {
+  // single vector
+  if (n == 1) {
+    // x <- L^-T x
+    for (int i=nv-1; i > 0; i--) {
+      // skip diagonal rows, zero elements in input vector
+      mjtNum x_i = x[i];
+      if (x_i == 0 || diagnum[i]) {
+        continue;
+      }
+
+      int start = rowadr[i];
+      int end = start + rownnz[i] - 1;
+      for (int adr=start; adr < end; adr++) {
+        x[colind[adr]] -= qLDs[adr] * x_i;
+      }
     }
 
-    int d = diagind[i];
-    int adr_i = rowadr[i];
-    mjtNum x_i = x[i];
-    for (int j=0; j < d; j++) {
-      int adr = adr_i + j;
-      x[colind[adr]] -= qLDs[adr] * x_i;
+    // x <- D^-1 x
+    for (int i=0; i < nv; i++) {
+      x[i] *= qLDiagInv[i];
+    }
+
+    // x <- L^-1 x
+    for (int i=1; i < nv; i++) {
+      // skip diagonal rows
+      if (diagnum[i]) {
+        i += diagnum[i] - 1;  // iterating forward: skip ahead, adjust i
+        continue;
+      }
+
+      int adr = rowadr[i];
+      x[i] -= mju_dotSparse(qLDs+adr, x, rownnz[i] - 1, colind+adr, /*flg_unc1=*/0);
     }
   }
 
-  // x(i) /= D(i,i)
-  for (int i=0; i < nv; i++) {
-    x[i] *= qLDiagInv[i];
-  }
+  // multiple vectors
+  else {
+    // x <- L^-T x
+    for (int i=nv-1; i > 0; i--) {
+      // skip diagonal rows
+      if (diagnum[i]) {
+        continue;
+      }
 
-  // x <- L^-1 x
-  for (int i=1; i < nv; i++) {
-    // skip diagonal (simple) rows
-    if (diagnum[i]) {
-      i += diagnum[i] - 1;  // when iterating forward we can skip ahead
-      continue;
+      int start = rowadr[i];
+      int end = start + rownnz[i] - 1;
+      for (int adr=start; adr < end; adr++) {
+        int j = colind[adr];
+        mjtNum val = qLDs[adr];
+        for (int offset=0; offset < n*nv; offset+=nv) {
+          mjtNum x_i;
+          if ((x_i = x[i+offset])) {
+            x[j+offset] -= val * x_i;
+          }
+        }
+      }
     }
 
-    int adr = rowadr[i];
-    x[i] -= mju_dotSparse(qLDs+adr, x, diagind[i], colind+adr, /*flg_unc1=*/0);
+    // x <- D^-1 x
+    for (int i=0; i < nv; i++) {
+      mjtNum invD_i = qLDiagInv[i];
+      for (int offset=0; offset < n*nv; offset+=nv) {
+        x[i+offset] *= invD_i;
+      }
+    }
+
+    // x <- L^-1 x
+    for (int i=1; i < nv; i++) {
+      // skip diagonal rows
+      if (diagnum[i]) {
+        i += diagnum[i] - 1;  // iterating forward: skip ahead, adjust i
+        continue;
+      }
+
+      int adr = rowadr[i];
+      int d = rownnz[i] - 1;
+      for (int offset=0; offset < n*nv; offset+=nv) {
+        x[i+offset] -= mju_dotSparse(qLDs+adr, x+offset, d, colind+adr, /*flg_unc1=*/0);
+      }
+    }
   }
 }
 

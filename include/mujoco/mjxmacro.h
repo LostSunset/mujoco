@@ -654,7 +654,6 @@
     X   ( int,       B_colind,          nB,          1           ) \
     X   ( int,       C_rownnz,          nv,          1           ) \
     X   ( int,       C_rowadr,          nv,          1           ) \
-    X   ( int,       C_diag,            nv,          1           ) \
     X   ( int,       C_colind,          nC,          1           ) \
     X   ( int,       mapM2C,            nC,          1           ) \
     X   ( int,       D_rownnz,          nv,          1           ) \
@@ -716,8 +715,8 @@
 #define MJDATA_ARENA_POINTERS_DUAL                           \
     X( int,      efc_AR_rownnz,     MJ_D(nefc), 1          ) \
     X( int,      efc_AR_rowadr,     MJ_D(nefc), 1          ) \
-    X( int,      efc_AR_colind,     MJ_D(nefc), MJ_D(nefc) ) \
-    X( mjtNum,   efc_AR,            MJ_D(nefc), MJ_D(nefc) )
+    X( int,      efc_AR_colind,     MJ_D(nA),   1          ) \
+    X( mjtNum,   efc_AR,            MJ_D(nA),   1          )
 
 // array fields of mjData that are used for constraint islands
 #define MJDATA_ARENA_POINTERS_ISLAND                 \
@@ -758,6 +757,7 @@
     X( int,       nl                 ) \
     X( int,       nefc               ) \
     X( int,       nJ                 ) \
+    X( int,       nA                 ) \
     X( int,       nisland            ) \
     X( mjtNum,    time               ) \
     X( uintptr_t, threadpool         )

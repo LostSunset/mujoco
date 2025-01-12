@@ -146,6 +146,9 @@ mjCModel::mjCModel() {
   defaults_.push_back(new mjCDef);
   defaults_.back()->name = "main";
 
+  // point to model from spec
+  PointToLocal();
+
   // world body
   mjCBody* world = new mjCBody(this);
   mjuu_zerovec(world->pos, 3);
@@ -163,14 +166,15 @@ mjCModel::mjCModel() {
   // create mjCBase lists from children lists
   CreateObjectLists();
 
-  // point to model from spec
-  PointToLocal();
+  // the source spec is the model itself, overwritten in the copy constructor
+  source_spec_ = &spec;
 }
 
 
 
 mjCModel::mjCModel(const mjCModel& other) {
   CreateObjectLists();
+  source_spec_ = (mjSpec*)&other.spec;
   *this = other;
 }
 
@@ -232,7 +236,7 @@ void mjCModel::CopyList(std::vector<T*>& dest,
     }
     // copy the element from the other model to this model
     source[i]->ForgetKeyframes();
-    mjSpec* origin = FindSpec(mjs_getString(source[i]->model->spec.modelname));
+    mjSpec* origin = FindSpec(source[i]->compiler);
     dest.push_back(candidate);
     dest.back()->model = this;
     dest.back()->compiler = origin ? &origin->compiler : &spec.compiler;
@@ -530,7 +534,6 @@ mjCModel& mjCModel::operator-=(const mjCBody& subtree) {
     ResetTreeLists();
   }
 
-  PointToLocal();
   return *this;
 }
 
@@ -1219,6 +1222,29 @@ mjSpec* mjCModel::FindSpec(std::string name) const {
     }
   }
   return nullptr;
+}
+
+
+
+// find spec by mjsCompiler pointer
+mjSpec* mjCModel::FindSpec(const mjsCompiler* compiler_) const {
+  if (&GetSourceSpec()->compiler == compiler_) {
+    return (mjSpec*)&spec;
+  }
+  for (auto s : specs_) {
+    mjSpec* source = static_cast<mjCModel*>(s->element)->FindSpec(compiler_);
+    if (source) {
+      return source;
+    }
+  }
+  return nullptr;
+}
+
+
+
+// get the spec from which this model was created
+mjSpec* mjCModel::GetSourceSpec() const {
+  return source_spec_;
 }
 
 
@@ -2495,7 +2521,7 @@ void mjCModel::CopyTree(mjModel* m) {
       }
     }
   }
-  m->nC = nC = 2 * nOD + nv;
+  m->nC = nC = nOD + nv;
 }
 
 // copy plugin data

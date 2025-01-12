@@ -12,6 +12,7 @@ Python bindings
   the computation. The thread pool can be reused across calls, but then the function cannot be called simultaneously
   from multiple threads. To run multiple threaded rollouts simultaneously, use the new class ``Rollout`` which
   encapsulates the thread pool. Contribution by :github:user:`aftersomemath`.
+- Fix global namespace pollution when using ``mjpython`` (:github:issue:`2265`).
 
 General
 ^^^^^^^
@@ -21,6 +22,9 @@ General
 
    - The field ``mjData.qLDiagSqrtInv`` has been removed. This field is only required for the dual solvers. It is now
      computed as-needed rather than unconditionally. Relatedly, added the corresponding argument to :ref:`mj_solveM2`.
+
+- Reduced the memory footprint of the PGS solver's :ref:`A matrix<soDual>`. This was the last remaining dense-memory
+  allocation in MuJoCo, allowing for a significant reduction of the :ref:`dynamic memory allocation heuristic<CSize>`.
 
 Bug fixes
 ^^^^^^^^^

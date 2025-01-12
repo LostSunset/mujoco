@@ -4702,6 +4702,11 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='number of non-zeros in constraint Jacobian',
              ),
              StructFieldDecl(
+                 name='nA',
+                 type=ValueType(name='int'),
+                 doc='number of non-zeros in constraint inverse inertia matrix',
+             ),
+             StructFieldDecl(
                  name='nisland',
                  type=ValueType(name='int'),
                  doc='number of detected constraint islands',
@@ -5389,14 +5394,6 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                  doc='reduced dof-dof: address of each row in C_colind (nv x 1)',  # pylint: disable=line-too-long
              ),
              StructFieldDecl(
-                 name='C_diag',
-                 type=PointerType(
-                     inner_type=ValueType(name='int'),
-                 ),
-                 doc='reduced dof-dof: index of diagonal element',
-                 array_extent=('nv',),
-             ),
-             StructFieldDecl(
                  name='C_colind',
                  type=PointerType(
                      inner_type=ValueType(name='int'),
@@ -5805,7 +5802,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='int'),
                  ),
                  doc='column indices in sparse AR',
-                 array_extent=('nefc', 'nefc'),
+                 array_extent=('nA',),
              ),
              StructFieldDecl(
                  name='efc_AR',
@@ -5813,7 +5810,7 @@ STRUCTS: Mapping[str, StructDecl] = dict([
                      inner_type=ValueType(name='mjtNum'),
                  ),
                  doc="J*inv(M)*J' + R",
-                 array_extent=('nefc', 'nefc'),
+                 array_extent=('nA',),
              ),
              StructFieldDecl(
                  name='efc_vel',
