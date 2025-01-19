@@ -485,6 +485,8 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"distance", "*", "8", "name", "geom1", "geom2", "body1", "body2", "cutoff", "noise", "user"},
         {"normal", "*", "8", "name", "geom1", "geom2", "body1", "body2", "cutoff", "noise", "user"},
         {"fromto", "*", "8", "name", "geom1", "geom2", "body1", "body2", "cutoff", "noise", "user"},
+        {"e_potential", "*", "4", "name", "cutoff", "noise", "user"},
+        {"e_kinetic", "*", "4", "name", "cutoff", "noise", "user"},
         {"clock", "*", "4", "name", "cutoff", "noise", "user"},
         {"user", "*", "9", "name", "objtype", "objname", "datatype", "needstage",
             "dim", "cutoff", "noise", "user"},
@@ -945,10 +947,16 @@ void mjXReader::Parse(XMLElement* root, const mjVFS* vfs) {
     Keyframe(section);
   }
 
+  // set deepcopy flag to true to copy child specs during attach calls
+  mjs_setDeepCopy(spec, true);
+
   for (XMLElement* section = FirstChildElement(root, "worldbody"); section;
        section = NextSiblingElement(section, "worldbody")) {
     Body(section, mjs_findBody(spec, "world"), nullptr, vfs);
   }
+
+  // set deepcopy flag to false to disable copying during attach in all future calls
+  mjs_setDeepCopy(spec, false);
 }
 
 
@@ -4166,7 +4174,13 @@ void mjXReader::Sensor(XMLElement* section) {
     }
 
     // global sensors
-    else if (type=="clock") {
+    else if (type=="e_potential") {
+      sensor->type = mjSENS_E_POTENTIAL;
+      sensor->objtype = mjOBJ_UNKNOWN;
+    } else if (type=="e_kinetic") {
+      sensor->type = mjSENS_E_KINETIC;
+      sensor->objtype = mjOBJ_UNKNOWN;
+    } else if (type=="clock") {
       sensor->type = mjSENS_CLOCK;
       sensor->objtype = mjOBJ_UNKNOWN;
     }

@@ -109,7 +109,7 @@ public const int mjMAXLINEPNT = 1000;
 public const int mjMAXPLANEGRID = 200;
 public const bool THIRD_PARTY_MUJOCO_MJXMACRO_H_ = true;
 public const bool THIRD_PARTY_MUJOCO_MUJOCO_H_ = true;
-public const int mjVERSION_HEADER = 327;
+public const int mjVERSION_HEADER = 328;
 
 
 // ------------------------------------Enums------------------------------------
@@ -377,9 +377,11 @@ public enum mjtSensor : int{
   mjSENS_GEOMDIST = 37,
   mjSENS_GEOMNORMAL = 38,
   mjSENS_GEOMFROMTO = 39,
-  mjSENS_CLOCK = 40,
-  mjSENS_PLUGIN = 41,
-  mjSENS_USER = 42,
+  mjSENS_E_POTENTIAL = 40,
+  mjSENS_E_KINETIC = 41,
+  mjSENS_CLOCK = 42,
+  mjSENS_PLUGIN = 43,
+  mjSENS_USER = 44,
 }
 public enum mjtStage : int{
   mjSTAGE_NONE = 0,

@@ -1045,6 +1045,24 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
          ),
          doc='Activate plugin. Returns 0 on success.',
      )),
+    ('mjs_setDeepCopy',
+     FunctionDecl(
+         name='mjs_setDeepCopy',
+         return_type=ValueType(name='int'),
+         parameters=(
+             FunctionParameterDecl(
+                 name='s',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjSpec'),
+                 ),
+             ),
+             FunctionParameterDecl(
+                 name='deepcopy',
+                 type=ValueType(name='int'),
+             ),
+         ),
+         doc='Turn deep copy on or off attach. Returns 0 on success.',
+     )),
     ('mj_printFormattedModel',
      FunctionDecl(
          name='mj_printFormattedModel',
@@ -9827,6 +9845,22 @@ FUNCTIONS: Mapping[str, FunctionDecl] = dict([
              ),
          ),
          doc='Find child body by name.',
+     )),
+    ('mjs_getParent',
+     FunctionDecl(
+         name='mjs_getParent',
+         return_type=PointerType(
+             inner_type=ValueType(name='mjsBody'),
+         ),
+         parameters=(
+             FunctionParameterDecl(
+                 name='element',
+                 type=PointerType(
+                     inner_type=ValueType(name='mjsElement'),
+                 ),
+             ),
+         ),
+         doc='Get parent body.',
      )),
     ('mjs_findFrame',
      FunctionDecl(

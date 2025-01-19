@@ -224,9 +224,23 @@ class mjCBase : public mjCBase_ {
   virtual void ForgetKeyframes() {}
   virtual void ForgetKeyframes() const {}
 
+  // increment and decrement reference count
+  // release uses the argument to delete the plugin
+  // which may be still owned by the source spec during shallow attach
+  virtual void AddRef() { ++refcount; }
+  virtual int GetRef() { return refcount; }
+  virtual void Release() {
+    if (--refcount == 0) {
+      delete this;
+    }
+  }
+
  protected:
   mjCBase();                                 // constructor
   mjCBase(const mjCBase& other);             // copy constructor
+
+  // reference count for allowing deleting an attached object
+  int refcount = 1;
 };
 
 
@@ -347,6 +361,16 @@ class mjCBody : public mjCBody_, private mjsBody {
 
   // set parent of this body
   void SetParent(mjCBody* _body) { parent = _body; }
+  mjCBody* GetParent() const { return parent; }
+
+  // set model of this body
+  void SetModel(mjCModel* _model);
+
+  // reset ids of all objects in this body
+  void ResetId();
+
+  // getters
+  std::vector<mjCBody*> Bodies() const { return bodies; }
 
  private:
   mjCBody(const mjCBody& other, mjCModel* _model);  // copy constructor
@@ -411,6 +435,7 @@ class mjCFrame : public mjCFrame_, private mjsFrame {
   void CopyFromSpec(void);
   void PointToLocal(void);
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
 
   mjCFrame& operator+=(const mjCBody& other);
 
@@ -462,6 +487,7 @@ class mjCJoint : public mjCJoint_, private mjsJoint {
 
   void CopyFromSpec(void);
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
 
   // used by mjXWriter and mjCModel
   const std::vector<double>& get_userdata() const { return userdata_; }
@@ -534,7 +560,6 @@ class mjCGeom : public mjCGeom_, private mjsGeom {
   mjCGeom(mjCModel* = nullptr, mjCDef* = nullptr);
   mjCGeom(const mjCGeom& other);
   mjCGeom& operator=(const mjCGeom& other);
-  ~mjCGeom();
 
   using mjCBase::name;
   mjsGeom spec;                       // variables set by user
@@ -543,6 +568,7 @@ class mjCGeom : public mjCGeom_, private mjsGeom {
   bool IsVisual(void) const { return visual_; }
   void SetNotVisual(void) { visual_ = false; }
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
   mjtGeom Type() const { return type; }
 
   // Compute all coefs modeling the interaction with the surrounding fluid.
@@ -608,6 +634,7 @@ class mjCSite : public mjCSite_, private mjsSite {
   // site's body
   mjCBody* Body() const { return body; }
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
 
   // use strings from mjCBase rather than mjStrings from mjsSite
   using mjCBase::name;
@@ -661,6 +688,7 @@ class mjCCamera : public mjCCamera_, private mjsCamera {
   const std::vector<double>& get_userdata() const { return userdata_; }
 
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
 
  private:
   void Compile(void);                     // compiler
@@ -701,6 +729,7 @@ class mjCLight : public mjCLight_, private mjsLight {
   const std::string& get_targetbody() const { return targetbody_; }
 
   void SetParent(mjCBody* _body) { body = _body; }
+  mjCBody* GetParent() const { return body; }
 
  private:
   void Compile(void);                     // compiler
@@ -1498,7 +1527,6 @@ class mjCActuator : public mjCActuator_, private mjsActuator {
   mjCActuator(mjCModel* = nullptr, mjCDef* = nullptr);
   mjCActuator(const mjCActuator& other);
   mjCActuator& operator=(const mjCActuator& other);
-  ~mjCActuator();
 
   mjsActuator spec;
   using mjCBase::name;
@@ -1560,7 +1588,6 @@ class mjCSensor : public mjCSensor_, private mjsSensor {
   mjCSensor(mjCModel*);
   mjCSensor(const mjCSensor& other);
   mjCSensor& operator=(const mjCSensor& other);
-  ~mjCSensor();
 
   mjsSensor spec;
   using mjCBase::name;

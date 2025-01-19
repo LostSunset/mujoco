@@ -71,25 +71,43 @@ using MjDoubleRefVec = Eigen::Ref<const Eigen::VectorXd>;
 
 struct MjSpec {
   MjSpec() : ptr(mj_makeSpec()) {}
-  MjSpec(raw::MjSpec* ptr) : ptr(ptr) {}
+  MjSpec(raw::MjSpec* ptr,
+         const std::unordered_map<std::string, py::bytes>& assets_ = {})
+      : ptr(ptr) {
+    for (const auto& asset : assets_) {
+      assets[asset.first.c_str()] = asset.second;
+    }
+  }
 
   // copy constructor and assignment
-  MjSpec(const MjSpec& other) : ptr(mj_copySpec(other.ptr)) {}
+  MjSpec(const MjSpec& other) : ptr(mj_copySpec(other.ptr)) {
+    assets = other.assets;
+  }
   MjSpec& operator=(const MjSpec& other) {
     ptr = mj_copySpec(other.ptr);
+    assets = other.assets;
     return *this;
   }
 
   // move constructor and move assignment
-  MjSpec(MjSpec&& other) : ptr(other.ptr) { other.ptr = nullptr; }
+  MjSpec(MjSpec&& other) : ptr(other.ptr) {
+    other.ptr = nullptr;
+    assets = other.assets;
+    other.assets.clear();
+  }
   MjSpec& operator=(MjSpec&& other) {
     ptr = other.ptr;
     other.ptr = nullptr;
+    assets = other.assets;
+    other.assets.clear();
     return *this;
   }
 
-  ~MjSpec() { mj_deleteSpec(ptr); }
+  ~MjSpec() {
+    mj_deleteSpec(ptr);
+  }
   raw::MjSpec* ptr;
+  py::dict assets;
 };
 
 template <typename LoadFunc>
@@ -263,6 +281,9 @@ PYBIND11_MODULE(_specs, m) {
             throw py::value_error(error);
           }
         }
+        if (assets.has_value()) {
+          return MjSpec(spec, assets.value());
+        }
         return MjSpec(spec);
       },
       py::arg("filename"), py::arg("assets") = py::none(), R"mydelimiter(
@@ -305,6 +326,9 @@ PYBIND11_MODULE(_specs, m) {
             throw py::value_error(error);
           }
         }
+        if (assets.has_value()) {
+          return MjSpec(spec, assets.value());
+        }
         return MjSpec(spec);
       },
       py::arg("xml"), py::arg("assets") = py::none(), R"mydelimiter(
@@ -324,8 +348,16 @@ PYBIND11_MODULE(_specs, m) {
                                         m, d);
   });
   mjSpec.def("copy", [](const MjSpec& self) -> MjSpec {
-    return MjSpec(mj_copySpec(self.ptr));
+    return MjSpec(self);
   });
+  mjSpec.def_property(
+      "copy_during_attach",
+      [](MjSpec& self) {
+        throw pybind11::value_error("copy_during_attach can only be set.");
+      },
+      [](MjSpec& self, bool deepcopy) {
+        return mjs_setDeepCopy(self.ptr, deepcopy);
+      });
   mjSpec.def_property_readonly(
       "worldbody",
       [](MjSpec& self) -> raw::MjsBody* {
@@ -370,33 +402,50 @@ PYBIND11_MODULE(_specs, m) {
         return mjs_findDefault(self.ptr, classname.c_str());
       },
       py::return_value_policy::reference_internal);
-  mjSpec.def("compile", [mjmodel_from_spec_ptr](MjSpec& self) {
-    return mjmodel_from_spec_ptr(reinterpret_cast<uintptr_t>(self.ptr));
-  });
   mjSpec.def(
-      "compile",
-      [mjmodel_from_spec_ptr](MjSpec& self, py::dict& assets) -> py::object {
-        mjVFS vfs;
-        mj_defaultVFS(&vfs);
-        for (auto item : assets) {
-          std::string buffer = py::cast<std::string>(item.second);
-          mj_addBufferVFS(&vfs, py::cast<std::string>(item.first).c_str(),
-                          buffer.c_str(), buffer.size());
-        };
-        auto model =
-            mjmodel_from_spec_ptr(reinterpret_cast<uintptr_t>(self.ptr),
-                                  reinterpret_cast<uintptr_t>(&vfs));
+      "find_geom",
+      [](MjSpec& self, std::string& name) -> raw::MjsGeom* {
+        return mjs_asGeom(mjs_findElement(self.ptr, mjOBJ_GEOM, name.c_str()));
+      },
+      py::return_value_policy::reference_internal);
+  mjSpec.def("compile", [mjmodel_from_spec_ptr](MjSpec& self) -> py::object {
+    if (self.assets.empty()) {
+      return mjmodel_from_spec_ptr(reinterpret_cast<uintptr_t>(self.ptr));
+    }
+    mjVFS vfs;
+    mj_defaultVFS(&vfs);
+    for (const auto& asset : self.assets) {
+      std::string buffer_name =
+          _impl::StripPath(py::cast<std::string>(asset.first).c_str());
+      std::string buffer = py::cast<std::string>(asset.second);
+      const int vfs_error = InterceptMjErrors(mj_addBufferVFS)(
+          &vfs, buffer_name.c_str(), buffer.c_str(), buffer.size());
+      if (vfs_error) {
         mj_deleteVFS(&vfs);
-        return model;
-      }, R"mydelimiter(
-    Compiles the spec and returns the compiled model.
-
-    Parameters
-    ----------
-    assets : dict, optional
-        A dictionary of assets to be used by the spec. The keys are asset names
-        and the values are asset contents.
-  )mydelimiter");
+        if (vfs_error == 2) {
+          throw py::value_error("Repeated file name in assets dict: " +
+                                buffer_name);
+        } else {
+          throw py::value_error("Asset failed to load: " + buffer_name);
+        }
+      }
+    }
+    auto model =
+        mjmodel_from_spec_ptr(reinterpret_cast<uintptr_t>(self.ptr),
+                              reinterpret_cast<uintptr_t>(&vfs));
+    mj_deleteVFS(&vfs);
+    return model;
+  });
+  mjSpec.def_property(
+      "assets",
+      [](MjSpec& self) -> py::dict {
+        return self.assets;
+      },
+      [](MjSpec& self, py::dict& assets) {
+        for (auto item : assets) {
+          self.assets[item.first] = item.second;
+        };
+  }, py::return_value_policy::reference_internal);
   mjSpec.def("to_xml", [](MjSpec& self) -> std::string {
     int size = mj_saveXMLString(self.ptr, nullptr, 0, nullptr, 0);
     std::unique_ptr<char[]> buf(new char[size + 1]);
@@ -645,6 +694,12 @@ PYBIND11_MODULE(_specs, m) {
         return mjs_getSpec(self.element);
       },
       py::return_value_policy::reference_internal);
+  mjsBody.def_property_readonly(
+      "parent",
+      [](raw::MjsBody& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsBody.def(
       "attach_frame",
       [](raw::MjsBody& self, raw::MjsFrame& frame,
@@ -678,6 +733,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsFrame.def("set_frame", [](raw::MjsFrame& self, raw::MjsFrame& frame) {
     mjs_setFrame(self.element, &frame);
   });
+  mjsFrame.def_property_readonly(
+      "parent",
+      [](raw::MjsFrame& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsFrame.def(
       "attach_body",
       [](raw::MjsFrame& self, raw::MjsBody& body,
@@ -725,6 +786,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsGeom.def("set_default", [](raw::MjsGeom& self, raw::MjsDefault& def) {
     mjs_setDefault(self.element, &def);
   });
+  mjsGeom.def_property_readonly(
+      "parent",
+      [](raw::MjsGeom& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsGeom.def(
       "default",
       [](raw::MjsGeom& self) -> raw::MjsDefault* {
@@ -740,6 +807,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsJoint.def("set_default", [](raw::MjsJoint& self, raw::MjsDefault& def) {
     mjs_setDefault(self.element, &def);
   });
+  mjsJoint.def_property_readonly(
+      "parent",
+      [](raw::MjsJoint& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsJoint.def(
       "default",
       [](raw::MjsJoint& self) -> raw::MjsDefault* {
@@ -755,6 +828,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsSite.def("set_default", [](raw::MjsSite& self, raw::MjsDefault& def) {
     mjs_setDefault(self.element, &def);
   });
+  mjsSite.def_property_readonly(
+      "parent",
+      [](raw::MjsSite& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsSite.def(
       "default",
       [](raw::MjsSite& self) -> raw::MjsDefault* {
@@ -810,6 +889,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsCamera.def("set_default", [](raw::MjsCamera& self, raw::MjsDefault& def) {
     mjs_setDefault(self.element, &def);
   });
+  mjsCamera.def_property_readonly(
+      "parent",
+      [](raw::MjsCamera& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsCamera.def(
       "default",
       [](raw::MjsCamera& self) -> raw::MjsDefault* {
@@ -825,6 +910,12 @@ PYBIND11_MODULE(_specs, m) {
   mjsLight.def("set_default", [](raw::MjsLight& self, raw::MjsDefault& def) {
     mjs_setDefault(self.element, &def);
   });
+  mjsLight.def_property_readonly(
+      "parent",
+      [](raw::MjsLight& self) -> raw::MjsBody* {
+        return mjs_getParent(self.element);
+      },
+      py::return_value_policy::reference_internal);
   mjsLight.def(
       "default",
       [](raw::MjsLight& self) -> raw::MjsDefault* {

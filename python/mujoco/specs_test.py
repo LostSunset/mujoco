@@ -646,6 +646,10 @@ class SpecsTest(absltest.TestCase):
     self.assertEqual(spec.bodies[2].name, 'body2')
     self.assertEqual(spec.bodies[3].name, 'body3')
     self.assertEqual(spec.bodies[4].name, 'body4')
+    self.assertEqual(spec.bodies[1].parent, spec.worldbody)
+    self.assertEqual(spec.bodies[2].parent, spec.worldbody)
+    self.assertEqual(spec.bodies[3].parent, spec.bodies[1])
+    self.assertEqual(spec.bodies[4].parent, spec.bodies[3])
     self.assertLen(spec.worldbody.find_all(bodytype), 4)
     self.assertLen(spec.bodies[1].find_all(bodytype), 2)
     self.assertLen(spec.bodies[3].find_all(bodytype), 1)
@@ -671,6 +675,11 @@ class SpecsTest(absltest.TestCase):
     self.assertEqual(spec.bodies[3].sites[2].name, 'site3')
     self.assertEqual(spec.bodies[3].sites[3].name, 'site4')
     self.assertEqual(spec.bodies[4].sites[0].name, 'site5')
+    self.assertEqual(spec.bodies[3].sites[0].parent, spec.bodies[3])
+    self.assertEqual(spec.bodies[3].sites[1].parent, spec.bodies[3])
+    self.assertEqual(spec.bodies[3].sites[2].parent, spec.bodies[3])
+    self.assertEqual(spec.bodies[3].sites[3].parent, spec.bodies[3])
+    self.assertEqual(spec.bodies[4].sites[0].parent, spec.bodies[4])
     with self.assertRaises(ValueError) as cm:
       spec.worldbody.find_all('actuator')
     self.assertEqual(
@@ -681,6 +690,24 @@ class SpecsTest(absltest.TestCase):
     body4 = spec.worldbody.find_all('body')[3]
     body4.name = 'body4_new'
     self.assertEqual(spec.bodies[4].name, 'body4_new')
+
+  def test_geom_list(self):
+    main_xml = """
+    <mujoco>
+      <worldbody>
+        <body name="body1"/>
+      </worldbody>
+    </mujoco>
+    """
+    spec = mujoco.MjSpec.from_string(main_xml)
+    geom1 = spec.worldbody.add_geom(name='geom1')
+    geom2 = spec.worldbody.add_geom(name='geom2')
+    geom3 = spec.find_body('body1').add_geom(name='geom3')
+
+    self.assertEqual(spec.geoms, [geom1, geom2, geom3])
+    self.assertEqual(spec.find_geom('geom1'), geom1)
+    self.assertEqual(spec.find_geom('geom2'), geom2)
+    self.assertEqual(spec.find_geom('geom3'), geom3)
 
   def test_iterators(self):
     spec = mujoco.MjSpec()
@@ -714,8 +741,10 @@ class SpecsTest(absltest.TestCase):
     geom = spec.worldbody.add_geom()
     geom.type = mujoco.mjtGeom.mjGEOM_MESH
     geom.meshname = 'cube'
-    model = spec.compile({'cube.obj': cube})
+    spec.assets = {'cube.obj': cube}
+    model = spec.compile()
     self.assertEqual(model.nmeshvert, 8)
+    self.assertEqual(spec.assets['cube.obj'], cube)
 
   def test_include(self):
     included_xml = """
@@ -907,27 +936,31 @@ class SpecsTest(absltest.TestCase):
     model = parent.compile()
     np.testing.assert_almost_equal(model.body_quat[1], [1, 0, 0, 0])
 
-  def test_attach_body_to_site(self):
-    child = mujoco.MjSpec()
+  def test_attach_to_site(self):
     parent = mujoco.MjSpec()
     site = parent.worldbody.add_site(pos=[1, 2, 3], quat=[0, 0, 0, 1])
-    body = child.worldbody.add_body()
 
     # Attach body to site and compile.
-    self.assertIsNotNone(site.attach_body(body, prefix='_'))
+    child1 = mujoco.MjSpec()
+    body1 = child1.worldbody.add_body()
+    self.assertIs(body1, site.attach_body(body1, prefix='_'))
+    body1.pos = [1, 1, 1]
     model1 = parent.compile()
     self.assertIsNotNone(model1)
     self.assertEqual(model1.nbody, 2)
-    np.testing.assert_array_equal(model1.body_pos[1], [1, 2, 3])
+    np.testing.assert_array_equal(model1.body_pos[1], [0, 1, 4])
     np.testing.assert_array_equal(model1.body_quat[1], [0, 0, 0, 1])
 
     # Attach entire spec to site and compile again.
-    self.assertIsNotNone(site.attach(child, prefix='child-'))
+    child2 = mujoco.MjSpec()
+    body2 = child2.worldbody.add_body(name='body')
+    self.assertIsNotNone(site.attach(child2, prefix='child-'))
+    body2.pos = [-1, -1, -1]
     model2 = parent.compile()
     self.assertIsNotNone(model2)
     self.assertEqual(model2.nbody, 3)
-    np.testing.assert_array_equal(model2.body_pos[1], [1, 2, 3])
-    np.testing.assert_array_equal(model2.body_pos[2], [1, 2, 3])
+    np.testing.assert_array_equal(model2.body_pos[1], [0, 1, 4])
+    np.testing.assert_array_equal(model2.body_pos[2], [2, 3, 2])
     np.testing.assert_array_equal(model2.body_quat[1], [0, 0, 0, 1])
     np.testing.assert_array_equal(model2.body_quat[2], [0, 0, 0, 1])
 
@@ -938,27 +971,31 @@ class SpecsTest(absltest.TestCase):
     frame = body.to_frame()
     np.testing.assert_array_equal(frame.pos, [1, 2, 3])
 
-  def test_attach_spec_to_frame(self):
-    child = mujoco.MjSpec()
+  def test_attach_to_frame(self):
     parent = mujoco.MjSpec()
     frame = parent.worldbody.add_frame(pos=[1, 2, 3], quat=[0, 0, 0, 1])
-    body = child.worldbody.add_body()
 
     # Attach body to frame and compile.
-    self.assertIsNotNone(frame.attach_body(body, prefix='_'))
+    child1 = mujoco.MjSpec()
+    body1 = child1.worldbody.add_body()
+    self.assertIs(body1, frame.attach_body(body1, prefix='_'))
+    body1.pos = [1, 1, 1]
     model1 = parent.compile()
     self.assertIsNotNone(model1)
     self.assertEqual(model1.nbody, 2)
-    np.testing.assert_array_equal(model1.body_pos[1], [1, 2, 3])
+    np.testing.assert_array_equal(model1.body_pos[1], [0, 1, 4])
     np.testing.assert_array_equal(model1.body_quat[1], [0, 0, 0, 1])
 
     # Attach entire spec to frame and compile again.
-    self.assertIsNotNone(frame.attach(child, prefix='child-'))
+    child2 = mujoco.MjSpec()
+    body2 = child2.worldbody.add_body(name='body')
+    self.assertIsNotNone(frame.attach(child2, prefix='child-'))
+    body2.pos = [-1, -1, -1]
     model2 = parent.compile()
     self.assertIsNotNone(model2)
     self.assertEqual(model2.nbody, 3)
-    np.testing.assert_array_equal(model2.body_pos[1], [1, 2, 3])
-    np.testing.assert_array_equal(model2.body_pos[2], [1, 2, 3])
+    np.testing.assert_array_equal(model2.body_pos[1], [0, 1, 4])
+    np.testing.assert_array_equal(model2.body_pos[2], [2, 3, 2])
     np.testing.assert_array_equal(model2.body_quat[1], [0, 0, 0, 1])
     np.testing.assert_array_equal(model2.body_quat[2], [0, 0, 0, 1])
 

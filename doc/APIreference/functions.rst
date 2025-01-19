@@ -1510,6 +1510,15 @@ Free memory allocation in mjSpec.
 
 Activate plugin. Returns 0 on success.
 
+.. _mjs_setDeepCopy:
+
+`mjs_setDeepCopy <#mjs_setDeepCopy>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_setDeepCopy
+
+Turn deep copy on or off attach. Returns 0 on success.
+
 .. _Errorandmemory:
 
 Error and memory
@@ -4174,6 +4183,15 @@ Find element in spec by name.
 .. mujoco-include:: mjs_findChild
 
 Find child body by name.
+
+.. _mjs_getParent:
+
+`mjs_getParent <#mjs_getParent>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_getParent
+
+Get parent body.
 
 .. _mjs_findFrame:
 

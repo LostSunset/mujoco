@@ -5,14 +5,25 @@ Changelog
 Upcoming version (not yet released)
 -----------------------------------
 
+General
+^^^^^^^
+- Added :ref:`mjs_setDeepCopy` API function. When the deep copy flag is 0, attaching a model will not copy it to the
+  parent, so the original references to the child can be used to modify the parent after attachment. The default
+  behavior is to perform such a shallow copy. The old behavior of creating a deep copy of the child model while
+  attaching can be restored by setting the deep copy flag to 1.
+- Added :ref:`potential<sensor-e_potential>` and :ref:`kinetic<sensor-e_kinetic>` energy sensors.
+
+Version 3.2.7 (Jan 14, 2025)
+----------------------------
+
 Python bindings
 ^^^^^^^^^^^^^^^
-- :ref:`rollout<PyRollout>` now features native multi-threading. If a sequence of ``MjData`` instances
-  of length ``nthread`` is passed in, ``rollout`` will automatically create a thread pool and parallelize
-  the computation. The thread pool can be reused across calls, but then the function cannot be called simultaneously
-  from multiple threads. To run multiple threaded rollouts simultaneously, use the new class ``Rollout`` which
-  encapsulates the thread pool. Contribution by :github:user:`aftersomemath`.
-- Fix global namespace pollution when using ``mjpython`` (:github:issue:`2265`).
+1. :ref:`rollout<PyRollout>` now features native multi-threading. If a sequence of ``MjData`` instances
+   of length ``nthread`` is passed in, ``rollout`` will automatically create a thread pool and parallelize
+   the computation. The thread pool can be reused across calls, but then the function cannot be called simultaneously
+   from multiple threads. To run multiple threaded rollouts simultaneously, use the new class ``Rollout`` which
+   encapsulates the thread pool. Contribution by :github:user:`aftersomemath`.
+2. Fix global namespace pollution when using ``mjpython`` (:github:issue:`2265`).
 
 General
 ^^^^^^^
@@ -20,16 +31,16 @@ General
 .. admonition:: Breaking API changes (minor)
    :class: attention
 
-   - The field ``mjData.qLDiagSqrtInv`` has been removed. This field is only required for the dual solvers. It is now
-     computed as-needed rather than unconditionally. Relatedly, added the corresponding argument to :ref:`mj_solveM2`.
+   3. The field ``mjData.qLDiagSqrtInv`` has been removed. This field is only required for the dual solvers. It is now
+      computed as-needed rather than unconditionally. Relatedly, added the corresponding argument to :ref:`mj_solveM2`.
 
-- Reduced the memory footprint of the PGS solver's :ref:`A matrix<soDual>`. This was the last remaining dense-memory
-  allocation in MuJoCo, allowing for a significant reduction of the :ref:`dynamic memory allocation heuristic<CSize>`.
+4. Reduced the memory footprint of the PGS solver's :ref:`A matrix<soDual>`. This was the last remaining dense-memory
+   allocation in MuJoCo, allowing for a significant reduction of the :ref:`dynamic memory allocation heuristic<CSize>`.
 
 Bug fixes
 ^^^^^^^^^
-- Fixed a bug in the box-sphere collider, depth was incorrect for deep penetrations (:github:issue:`2206`).
-- Fixed a bug in :ref:`mj_mulM2` and added a test.
+5. Fixed a bug in the box-sphere collider, depth was incorrect for deep penetrations (:github:issue:`2206`).
+6. Fixed a bug in :ref:`mj_mulM2` and added a test.
 
 Version 3.2.6 (Dec 2, 2024)
 ---------------------------

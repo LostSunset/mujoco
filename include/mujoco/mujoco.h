@@ -16,7 +16,7 @@
 #define MUJOCO_MUJOCO_H_
 
 // header version; should match the library version as returned by mj_version()
-#define mjVERSION_HEADER 327
+#define mjVERSION_HEADER 328
 
 // needed to define size_t, fabs and log10
 #include <stdlib.h>
@@ -241,6 +241,9 @@ MJAPI void mj_deleteSpec(mjSpec* s);
 
 // Activate plugin. Returns 0 on success.
 MJAPI int mjs_activatePlugin(mjSpec* s, const char* name);
+
+// Turn deep copy on or off attach. Returns 0 on success.
+MJAPI int mjs_setDeepCopy(mjSpec* s, int deepcopy);
 
 
 //---------------------------------- Printing ------------------------------------------------------
@@ -1545,6 +1548,9 @@ MJAPI mjsElement* mjs_findElement(mjSpec* s, mjtObj type, const char* name);
 
 // Find child body by name.
 MJAPI mjsBody* mjs_findChild(mjsBody* body, const char* name);
+
+// Get parent body.
+MJAPI mjsBody* mjs_getParent(mjsElement* element);
 
 // Find frame by name.
 MJAPI mjsFrame* mjs_findFrame(mjSpec* s, const char* name);

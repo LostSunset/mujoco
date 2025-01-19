@@ -601,9 +601,17 @@ from its default.
 .. _option-flag-energy:
 
 :at:`energy`: :at-val:`[disable, enable], "disable"`
-   This flag enables the computation of kinetic and potential energy, stored in mjData.energy and displayed in the GUI.
-   This feature adds some CPU time but it is usually negligible. Monitoring energy for a system that is supposed to be
-   energy-conserving is one of the best ways to assess the accuracy of a complex simulation.
+   This flag enables the computation of potential and kinetic energy in ``mjData.energy[0, 1]`` respectively,
+   and displayed in the simulate GUI info overlay. Potential energy includes the gravitational component summed over
+   all bodies :math:`\sum_b m_b g h` and energy stored in passive springs in joints, tendons and flexes
+   :math:`\tfrac{1}{2} k x^2`, where :math:`x` is the displacement and and :math:`k` is the spring constant. Kinetic
+   energy is given by :math:`\tfrac{1}{2} v^T M v`, where :math:`v` is the velocity and :math:`M` is the
+   mass matrix. Note that potential and kinetic energy in constraints is not accounted for.
+
+   The extra computation (also triggered by :ref:`potential<sensor-e_potential>` and
+   :ref:`kinetic<sensor-e_kinetic>` energy sensors) adds some CPU time but it is usually negligible. Monitoring energy
+   for a system that is supposed to be energy-conserving is one of the best ways to assess the accuracy of a complex
+   simulation.
 
 .. _option-flag-fwdinv:
 
@@ -2359,7 +2367,8 @@ helps clarify the role of bodies and geoms in MuJoCo.
    This attribute specifies an integer group to which the geom belongs. The only effect on the physics is at compile
    time, when body masses and inertias are inferred from geoms selected based on their group; see inertiagrouprange
    attribute of :ref:`compiler <compiler>`. At runtime this attribute is used by the visualizer to enable and disable
-   the rendering of entire geom groups. It can also be used as a tag for custom computations.
+   the rendering of entire geom groups. By default, groups 0, 1 and 2 are visible, while all other groups are invisible.
+   The group attribute can also be used as a tag for custom computations.
 
 .. _body-geom-priority:
 
@@ -4372,7 +4381,7 @@ ball joint outside the kinematic tree. Connect constraints can be specified in o
 
 - Using :ref:`body1<equality-connect-body1>` and :ref:`anchor<equality-connect-anchor>` (both required) and
   optionally :ref:`body2<equality-connect-body2>`. When using this specification, the constraint is assumed to be
-  satisfied in the configuration in which the model is defined.
+  satisfied at the configuration in which the model is defined (``mjData.qpos0``).
 - :ref:`site1<equality-connect-site1>` and :ref:`site2<equality-connect-site2>` (both required). When using this
   specification, the two sites will be pulled together by the constraint, regardless of their position in the default
   configuration. An example of this specification is shown in
@@ -4418,8 +4427,8 @@ ball joint outside the kinematic tree. Connect constraints can be specified in o
 
 :at:`anchor`: :at-val:`real(3), optional`
    Coordinates of the 3D anchor point where the two bodies are connected, in the local coordinate frame of :at:`body1`.
-   The constraint is assumed to be satisfied in the configuration in which the model is defined, which lets the compiler
-   compute the associated anchor point for :at:`body2`.
+   The constraint is assumed to be satisfied in the configuration at which the model is defined (``mjData.qpos0``),
+   which lets the compiler compute the associated anchor point for :at:`body2`.
 
 .. _equality-connect-site1:
 
@@ -7244,6 +7253,45 @@ See :ref:`collision-sensors` for more details about sensors of this type.
 
 :at:`name`, :at:`noise`, :at:`user`
    See :ref:`CSensor`.
+
+
+.. _sensor-e_potential:
+
+:el-prefix:`sensor/` |-| **e_potential** (*)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This element creates sensor that returns the potential energy.
+
+.. _sensor-e_potential-name:
+
+.. _sensor-e_potential-noise:
+
+.. _sensor-e_potential-cutoff:
+
+.. _sensor-e_potential-user:
+
+:at:`name`, :at:`noise`, :at:`cutoff`, :at:`user`
+   See :ref:`CSensor`.
+
+
+.. _sensor-e_kinetic:
+
+:el-prefix:`sensor/` |-| **e_kinetic** (*)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This element creates sensor that returns the kinetic energy.
+
+.. _sensor-e_kinetic-name:
+
+.. _sensor-e_kinetic-noise:
+
+.. _sensor-e_kinetic-cutoff:
+
+.. _sensor-e_kinetic-user:
+
+:at:`name`, :at:`noise`, :at:`cutoff`, :at:`user`
+   See :ref:`CSensor`.
+
 
 .. _sensor-clock:
 

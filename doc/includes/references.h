@@ -674,6 +674,8 @@ typedef enum mjtSensor_ {         // type of sensor
   mjSENS_GEOMFROMTO,              // segment between two geoms
 
   // global sensors
+  mjSENS_E_POTENTIAL,             // potential energy
+  mjSENS_E_KINETIC,               // kinetic energy
   mjSENS_CLOCK,                   // simulation time
 
   // plugin-controlled sensors
@@ -3181,6 +3183,7 @@ mjSpec* mj_makeSpec(void);
 mjSpec* mj_copySpec(const mjSpec* s);
 void mj_deleteSpec(mjSpec* s);
 int mjs_activatePlugin(mjSpec* s, const char* name);
+int mjs_setDeepCopy(mjSpec* s, int deepcopy);
 void mj_printFormattedModel(const mjModel* m, const char* filename, const char* float_format);
 void mj_printModel(const mjModel* m, const char* filename);
 void mj_printFormattedData(const mjModel* m, mjData* d, const char* filename,
@@ -3607,6 +3610,7 @@ mjSpec* mjs_findSpec(mjSpec* spec, const char* name);
 mjsBody* mjs_findBody(mjSpec* s, const char* name);
 mjsElement* mjs_findElement(mjSpec* s, mjtObj type, const char* name);
 mjsBody* mjs_findChild(mjsBody* body, const char* name);
+mjsBody* mjs_getParent(mjsElement* element);
 mjsFrame* mjs_findFrame(mjSpec* s, const char* name);
 mjsDefault* mjs_getDefault(mjsElement* element);
 const mjsDefault* mjs_findDefault(mjSpec* s, const char* classname);
