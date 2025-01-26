@@ -353,58 +353,63 @@ TEST_F(CoreSmoothTest, RefsiteConservesMomentum) {
 
 static const char* const kIlslandEfcPath =
     "engine/testdata/island/island_efc.xml";
+static const char* const kModelPath =
+    "testdata/model.xml";
 
 TEST_F(CoreSmoothTest, SolveMIsland) {
-  const std::string xml_path = GetTestDataFilePath(kIlslandEfcPath);
-  mjModel* model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
-  mjData* data = mj_makeData(model);
-  int nv = model->nv;
+  for (auto model_path : {kModelPath, kIlslandEfcPath}) {
+    const std::string xml_path = GetTestDataFilePath(model_path);
+    mjModel* model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
+    mjData* data = mj_makeData(model);
+    int nv = model->nv;
 
-  // allocate vec, fill with arbitrary values, copy to sol
-  mjtNum* vec = (mjtNum*) mju_malloc(sizeof(mjtNum) * nv);
-  mjtNum* res = (mjtNum*) mju_malloc(sizeof(mjtNum) * nv);
-  for (int i=0; i < nv; i++) {
-    vec[i] = 0.2 + 0.3*i;
-  }
-  mju_copy(res, vec, nv);
+    // allocate vec, fill with arbitrary values, copy to sol
+    mjtNum* vec = (mjtNum*) mju_malloc(sizeof(mjtNum) * nv);
+    mjtNum* res = (mjtNum*) mju_malloc(sizeof(mjtNum) * nv);
+    for (int i=0; i < nv; i++) {
+      vec[i] = 0.2 + 0.3*i;
+    }
+    mju_copy(res, vec, nv);
 
-  // simulate for 0.2 seconds
-  mj_resetData(model, data);
-  while (data->time < 0.2) {
-    mj_step(model, data);
-  }
-  mj_forward(model, data);
+    if (model->nkey > 0) mj_resetDataKeyframe(model, data, 0);
 
-  // divide by mass matrix: sol = M^-1 * vec
-  mj_solveM(model, data, res, res, 1);
-
-  // iterate over islands
-  for (int i=0; i < data->nisland; i++) {
-    // allocate dof vectors for island
-    int dofnum = data->island_dofnum[i];
-    mjtNum* res_i = (mjtNum*)mju_malloc(sizeof(mjtNum) * dofnum);
-
-    // copy values into sol_i
-    int* dofind = data->island_dofind + data->island_dofadr[i];
-    for (int j=0; j < dofnum; j++) {
-      res_i[j] = vec[dofind[j]];
+    for (int i=0; i < 6; i++) {
+      mj_step(model, data);
     }
 
-    // divide by mass matrix, for this island
-    mj_solveM_island(model, data, res_i, i);
+    mj_forward(model, data);
 
-    // expect corresponding values to match
-    for (int j=0; j < dofnum; j++) {
-      EXPECT_THAT(res_i[j], DoubleNear(res[dofind[j]], 1e-12));
+    // divide by mass matrix: sol = M^-1 * vec
+    mj_solveM(model, data, res, res, 1);
+
+    // iterate over islands
+    for (int i=0; i < data->nisland; i++) {
+      // allocate dof vectors for island
+      int dofnum = data->island_dofnum[i];
+      mjtNum* res_i = (mjtNum*)mju_malloc(sizeof(mjtNum) * dofnum);
+
+      // copy values into sol_i
+      int* dofind = data->island_dofind + data->island_dofadr[i];
+      for (int j=0; j < dofnum; j++) {
+        res_i[j] = vec[dofind[j]];
+      }
+
+      // divide by mass matrix, for this island
+      mj_solveM_island(model, data, res_i, i);
+
+      // expect corresponding values to match
+      for (int j=0; j < dofnum; j++) {
+        EXPECT_THAT(res_i[j], DoubleNear(res[dofind[j]], 1e-14));
+      }
+
+      mju_free(res_i);
     }
 
-    mju_free(res_i);
+    mju_free(res);
+    mju_free(vec);
+    mj_deleteData(data);
+    mj_deleteModel(model);
   }
-
-  mju_free(res);
-  mju_free(vec);
-  mj_deleteData(data);
-  mj_deleteModel(model);
 }
 
 static const char* const kInertiaPath = "engine/testdata/inertia.xml";
@@ -539,6 +544,52 @@ TEST_F(CoreSmoothTest, SolveLDmultipleVectors) {
   // expect vectors to match up to floating point precision
   for (int i=0; i < nv*n; i++) {
     EXPECT_FLOAT_EQ(vec[i], vec2[i]);
+  }
+
+  mj_deleteData(d);
+  mj_deleteModel(m);
+}
+
+TEST_F(CoreSmoothTest, SolveM2) {
+  const std::string xml_path = GetTestDataFilePath(kInertiaPath);
+  char error[1024];
+  mjModel* m = mj_loadXML(xml_path.c_str(), nullptr, error, sizeof(error));
+  ASSERT_THAT(m, NotNull()) << "Failed to load model: " << error;
+
+  mjData* d = mj_makeData(m);
+  mj_forward(m, d);
+
+  int nv = m->nv;
+  int nC = m->nC;
+
+  // copy LD into LDs: CSR format
+  vector<mjtNum> LDs(nC);
+  for (int i=0; i < nC; i++) {
+    LDs[i] = d->qLD[d->mapM2C[i]];
+  }
+
+  // inverse square root of D from inertia LDL decomposition
+  vector<mjtNum> sqrtInvD(nv);
+  for (int i=0; i < nv; i++) {
+    sqrtInvD[i] = 1 / mju_sqrt(d->qLD[m->dof_Madr[i]]);
+  }
+
+  // compare full solve and half solve
+  int n = 3;
+  vector<mjtNum> vec(nv*n);
+  vector<mjtNum> vec2(nv*n);
+  for (int i=0; i < nv*n; i++) vec[i] = vec2[i] = 2 + 3*i;
+  for (int i=0; i < nv*n; i+=3) vec[i] = vec2[i] = 0;
+  vector<mjtNum> res(nv*n);
+
+  mj_solveM2(m, d, res.data(), vec.data(), sqrtInvD.data(), n);
+  mj_solveLDs(vec2.data(), LDs.data(), d->qLDiagInv, nv, n,
+              d->C_rownnz, d->C_rowadr, m->dof_simplenum, d->C_colind);
+
+  // expect equality of dot(v, M^-1 * v) and dot(M^-1/2 * v, M^-1/2 * v)
+  for (int i=0; i < n; i++) {
+    EXPECT_FLOAT_EQ(mju_dot(vec2.data() + i*nv, vec.data() + i*nv, nv),
+                    mju_dot(res.data() + i*nv, res.data() + i*nv, nv));
   }
 
   mj_deleteData(d);
