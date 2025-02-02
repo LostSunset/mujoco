@@ -453,19 +453,51 @@ void mj_flex(const mjModel* m, mjData* d) {
   for (int f=0; f < m->nflex; f++) {
     int vstart = m->flex_vertadr[f];
     int vend = m->flex_vertadr[f] + m->flex_vertnum[f];
+    int nstart = m->flex_nodeadr[f];
+    int nend = m->flex_nodeadr[f] + m->flex_nodenum[f];
 
-    // centered: copy body position
-    if (m->flex_centered[f]) {
-      for (int i=vstart; i < vend; i++) {
-        mju_copy3(d->flexvert_xpos+3*i, d->xpos+3*m->flex_vertbodyid[i]);
+    // 0: vertices are the mesh vertices, 1: vertices are interpolated from nodal dofs
+    if (m->flex_interp[f] == 0) {
+      // centered: copy body position
+      if (m->flex_centered[f]) {
+        for (int i=vstart; i < vend; i++) {
+          mju_copy3(d->flexvert_xpos+3*i, d->xpos+3*m->flex_vertbodyid[i]);
+        }
+      }
+
+      // non-centered: map from local to global
+      else {
+        for (int i=vstart; i < vend; i++) {
+          mju_mulMatVec3(d->flexvert_xpos+3*i, d->xmat+9*m->flex_vertbodyid[i], m->flex_vert+3*i);
+          mju_addTo3(d->flexvert_xpos+3*i, d->xpos+3*m->flex_vertbodyid[i]);
+        }
       }
     }
 
-    // non-centered: map from local to global
+    // trilinear interpolation
     else {
+      mjtNum nodexpos[mjMAXFLEXNODES];
+      if (m->flex_centered[f]) {
+        for (int i=nstart; i < nend; i++) {
+          mju_copy3(nodexpos + 3*(i-nstart), d->xpos + 3*m->flex_nodebodyid[i]);
+        }
+      } else {
+        for (int i=nstart; i < nend; i++) {
+          int j = i - nstart;
+          mju_mulMatVec3(nodexpos + 3*j, d->xmat + 9*m->flex_nodebodyid[i], m->flex_node + 3*i);
+          mju_addTo3(nodexpos + 3*j, d->xpos + 3*m->flex_nodebodyid[i]);
+        }
+      }
+
       for (int i=vstart; i < vend; i++) {
-        mju_mulMatVec3(d->flexvert_xpos+3*i, d->xmat+9*m->flex_vertbodyid[i], m->flex_vert+3*i);
-        mju_addTo3(d->flexvert_xpos+3*i, d->xpos+3*m->flex_vertbodyid[i]);
+        mju_zero3(d->flexvert_xpos+3*i);
+        mjtNum* coord = m->flex_vert0 + 3*i;
+        for (int j=0; j < nend-nstart; j++) {
+          mjtNum coef = (j&1 ? coord[2] : 1-coord[2]) *
+                        (j&2 ? coord[1] : 1-coord[1]) *
+                        (j&4 ? coord[0] : 1-coord[0]);
+          mju_addToScl3(d->flexvert_xpos+3*i, nodexpos+3*j, coef);
+        }
       }
     }
   }
@@ -542,7 +574,7 @@ void mj_flex(const mjModel* m, mjData* d) {
   // compute lengths and Jacobians of edges
   for (int f=0; f < m->nflex; f++) {
     // skip if edges cannot generate forces
-    if (m->flex_rigid[f]) {
+    if (m->flex_rigid[f] || m->flex_interp[f]) {
       continue;
     }
 
@@ -665,7 +697,7 @@ void mj_tendon(const mjModel* m, mjData* d) {
       rowadr[i] = (i > 0 ? rowadr[i-1] + rownnz[i-1] : 0);
     }
 
-    // process joint tendon
+    // process fixed tendon
     if (m->wrap_type[adr] == mjWRAP_JOINT) {
       // process all defined joints
       for (int j=0; j < tendon_num; j++) {
@@ -677,33 +709,15 @@ void mj_tendon(const mjModel* m, mjData* d) {
 
         // add to moment
         if (issparse) {
-          J[rowadr[i] + rownnz[i]] = m->wrap_prm[adr+j];
-          colind[rowadr[i] + rownnz[i]] = m->jnt_dofadr[k];
-          rownnz[i]++;
+          rownnz[i] = mju_combineSparse(J+rowadr[i], &m->wrap_prm[adr+j], 1, 1,
+                                        rownnz[i], 1,
+                                        colind+rowadr[i], &m->jnt_dofadr[k],
+                                        sparse_buf, buf_ind);
         }
 
         // add to moment: dense
         else {
           J[i*nv + m->jnt_dofadr[k]] = m->wrap_prm[adr+j];
-        }
-      }
-
-      // sort on colind if sparse: custom insertion sort
-      if (issparse) {
-        int x, *list = colind+rowadr[i], nnz = rownnz[i];
-        mjtNum y, *listy = J+rowadr[i];
-
-        for (int k=1; k < nnz; k++) {
-          x = list[k];
-          y = listy[k];
-          int j = k-1;
-          while (j >= 0 && list[j] > x) {
-            list[j+1] = list[j];
-            listy[j+1] = listy[j];
-            j--;
-          }
-          list[j+1] = x;
-          listy[j+1] = y;
         }
       }
 

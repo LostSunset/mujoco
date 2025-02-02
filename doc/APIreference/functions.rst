@@ -504,7 +504,7 @@ found, the function will return ``distmax`` and ``fromto``, if given, will be se
    .. TODO: b/339596989 - Improve mjc_Convex.
 
    For some colliders, a large, positive ``distmax`` will result in an accurate measurement. However, for collision
-   pairs which use the general ``mjc_Convex`` collider, the result will be approximate and likely innacurate.
+   pairs which use the general ``mjc_Convex`` collider, the result will be approximate and likely inaccurate.
    This is considered a bug to be fixed in a future release.
    In order to determine whether a geom pair uses ``mjc_Convex``, inspect the table at the top of
    `engine_collision_driver.c <https://github.com/google-deepmind/mujoco/blob/main/src/engine/engine_collision_driver.c>`__.
@@ -3572,8 +3572,8 @@ Construct quaternion performing rotation from z-axis to given vector.
 
 .. mujoco-include:: mju_mat2Rot
 
-extract 3D rotation from an arbitrary 3x3 matrix by refining the input quaternion
-returns the number of iterations required to converge
+Extract 3D rotation from an arbitrary 3x3 matrix by refining the input quaternion.
+Returns the number of iterations required to converge
 
 .. _mju_euler2Quat:
 

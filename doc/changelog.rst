@@ -5,13 +5,37 @@ Changelog
 Upcoming version (not yet released)
 -----------------------------------
 
+
+Feature promotion
+^^^^^^^^^^^^^^^^^
+.. youtube:: qJFbx-FR7Bc
+   :align: right
+   :width: 240px
+
+- Introduced a new kind of **fast deformable body**, activated by setting :ref:`flexcomp/dof<body-flexcomp-dof>` to
+  "trilinear". This type of :ref:`deformable<CDeformable>` flex object has the same collision geometry as a regular
+  flex, but has far fewer degrees of freedom. Instead of 3 dofs per vertex, only the corners of the bounding box are
+  free to move, with the positions of the interior vertices computed with trilinear interpolation of the 8 corners, for
+  a total of 24 dofs for the entire flex object (or less, if some of the corners are pinned). This limits the types of
+  deformation achievable by the flex, but allows for much faster simulation. For example, see the video on the right
+  comparing `full <https://github.com/google-deepmind/mujoco/blob/main/model/flex/gripper.xml>`__ and `trilinear
+  <https://github.com/google-deepmind/mujoco/blob/main/model/flex/gripper_trilinear.xml>`__ flexes for modeling
+  deformable gripper pads.
+
 General
 ^^^^^^^
+- Separate collision and deformation meshes for :ref:`flex<deformable-flex>`. This enables a fixed cost for the soft
+  body computations, while preserving the fidelity of high-resolution collisions.
 - Added :ref:`mjs_setDeepCopy` API function. When the deep copy flag is 0, attaching a model will not copy it to the
   parent, so the original references to the child can be used to modify the parent after attachment. The default
   behavior is to perform such a shallow copy. The old behavior of creating a deep copy of the child model while
   attaching can be restored by setting the deep copy flag to 1.
 - Added :ref:`potential<sensor-e_potential>` and :ref:`kinetic<sensor-e_kinetic>` energy sensors.
+
+MJX
+^^^
+- Added support for spatial tendons with internal sphere and cylinder wrapping.
+- Fix a bug with box-box collisions :github:issue:`2356`.
 
 Version 3.2.7 (Jan 14, 2025)
 ----------------------------
@@ -88,7 +112,7 @@ General
 4. The not-useful ``convexhull`` compiler option (to disable computation of mesh convex hulls) has been removed.
 5. Removed the deprecated ``mju_rotVecMat``, ``mju_rotVecMatT`` and ``mjv_makeConnector`` functions.
 6. Sorting now uses a faster, native sort function (fixes :github:issue:`1638`).
-7. The PBR texture layers introduced in 3.2.1 were refactored from seperate sub-elements to a single
+7. The PBR texture layers introduced in 3.2.1 were refactored from separate sub-elements to a single
    :ref:`layer<material-layer>` sub-element.
 8. The composite types box, cylinder, and sphere have been removed. Users should instead use the equivalent types
    available in :ref:`flexcomp<body-flexcomp>`.
@@ -178,7 +202,7 @@ General
 
 4. Added the :ref:`nativeccd<option-flag-nativeccd>` flag. When this flag is enabled, general convex collision
    detection is handled with a new native code path, rather than `libccd <https://github.com/danfis/libccd>`__.
-   This feature is in early stages of testing, but users who've experienced issues related to collsion detection are
+   This feature is in early stages of testing, but users who've experienced issues related to collision detection are
    welcome to experiment with it and report any issues.
 
 .. youtube:: kcM_oauk3ZA
@@ -316,7 +340,7 @@ General
       The older functions have been removed from the Python bindings and will be removed from the C API in the next
       release.
    5. Removed the ``actuator_actdim`` callback from actuator plugins. They now have the ``actdim`` attribute, which
-      must be used with actuators that write state to the ``act`` array. This fixed a crash which happend when
+      must be used with actuators that write state to the ``act`` array. This fixed a crash which happened when
       keyframes were used in a model with stateful actuator plugins. The PID plugin will give an error when the wrong
       value of actdim is provided.
 
@@ -577,7 +601,7 @@ General
 1. Improved the :ref:`discardvisual<compiler-discardvisual>` compiler flag, which now discards all visual-only assets.
    See :ref:`discardvisual<compiler-discardvisual>` for details.
 2. Removed the :ref:`timer<mjtTimer>` for midphase colllision detection, it is now folded in with the narrowphase
-   timer. This is because timing the two phases seperately required fine-grained timers inside the collision
+   timer. This is because timing the two phases separately required fine-grained timers inside the collision
    functions; these functions are so small and fast that the timer itself was incurring a measurable cost.
 3. Added the flag :ref:`bvactive<visual-global-bvactive>` to ``visual/global``, allowing users to turn off
    visualisation of active bounding volumes (the red/green boxes in this :ref:`this changelog item<midphase>`). For
@@ -1050,7 +1074,7 @@ Simulate
    :width: 240px
 
 6. Added Visualization tab to simulate UI, corresponding to elements of the :ref:`visual<visual>` MJCF element. After
-   modifying values in the GUI, a saved XML will contain the new values. The modifyable members of
+   modifying values in the GUI, a saved XML will contain the new values. The modifiable members of
    :ref:`mjStatistic` (:ref:`extent<statistic-extent>`, :ref:`meansize<statistic-meansize>` and
    :ref:`center<statistic-center>`) are computed by the compiler and therefore do not have defaults. In order for these
    attributes to appear in the saved XML, a value must be specified in the loaded XML.
@@ -1169,7 +1193,7 @@ Python bindings
    passive viewer now also requires an explicit call to ``sync`` on its handle to pick up any update to the physics
    state. This is to avoid race conditions that can result in visual artifacts. See
    :ref:`documentation<PyViewerPassive>` for details.
-#. The ``viewer.launch_repl`` function has been removed since its functionality is superceded by ``launch_passive``.
+#. The ``viewer.launch_repl`` function has been removed since its functionality is superseded by ``launch_passive``.
 #. Added a small number of missing struct fields discovered through the new ``introspect`` metadata.
 
 Bug fixes
