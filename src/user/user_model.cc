@@ -1867,6 +1867,10 @@ void mjCModel::AutoSpringDamper(mjModel* m) {
     mjtNum stiffness = inertia / std::max(mjMINVAL, timeconst*timeconst*dampratio*dampratio);
     mjtNum damping = 2 * inertia / std::max(mjMINVAL, timeconst);
 
+    // save stiffness and damping in the private mjsJoints
+    joints_[n]->stiffness = stiffness;
+    joints_[n]->damping = damping;
+
     // assign
     m->jnt_stiffness[n] = stiffness;
     for (int i=0; i<ndim; i++) {
@@ -4243,8 +4247,9 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
   // mark meshes that need convex hull
   for (int i=0; i<geoms_.size(); i++) {
     if (geoms_[i]->mesh &&
-        (geoms_[i]->spec.type==mjGEOM_MESH || geoms_[i]->spec.type==mjGEOM_SDF) &&
-        (geoms_[i]->spec.contype || geoms_[i]->spec.conaffinity)) {
+        (geoms_[i]->spec.type == mjGEOM_MESH || geoms_[i]->spec.type == mjGEOM_SDF) &&
+        (geoms_[i]->spec.contype || geoms_[i]->spec.conaffinity ||
+         geoms_[i]->mesh->spec.inertia == mjINERTIA_CONVEX)) {
       geoms_[i]->mesh->SetNeedHull(true);
     }
   }
