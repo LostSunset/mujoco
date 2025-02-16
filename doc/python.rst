@@ -507,9 +507,8 @@ Note the ``from_string()`` and ``from_file()`` methods can only be called at con
 Assets
 ^^^^^^
 
-All three methods take in an optional argument called ``assets`` which is used
-to resolve asset references in the XML. This argument is a dictionary that maps
-asset name (string) to asset data (bytes), as demonstrated below:
+All three methods take in an optional argument called ``assets`` which is used to resolve asset references in the XML.
+This argument is a dictionary that maps asset name (string) to asset data (bytes), as demonstrated below:
 
 .. code-block:: python
 
@@ -587,14 +586,18 @@ Convenience methods
 The Python bindings provide a number of convenience methods and attributes not directly available in the C API in order
 to make model editing easier:
 
+Named access
+^^^^^^^^^^^^
+The ``MjSpec`` object has methods like ``.body(), .joint(), .site(), ...`` for named access of elements.
+``spec.geom('my_geom')`` will return the :ref:`mjsGeom` called "my_geom", or ``None`` if it does not exist.
+
 Element lists
 ^^^^^^^^^^^^^
 Lists of all elements in a spec can be accessed using named properties, using the plural form. For example,
-``spec.meshes`` returns a list of all meshes in the spec.
-
-The following properties are implemented: ``sites``, ``geoms``, ``joints``, ``lights``, ``cameras``, ``bodies``,
-``frames``, ``materials``, ``meshes``, ``pairs``, ``equalities``, ``tendons``, ``actuators``, ``skins``, ``textures``,
-``texts``, ``tuples``, ``flexes``, ``hfields``, ``keys``, ``numerics``, ``excludes``, ``sensors``, ``plugins``.
+``spec.meshes`` returns a list of all meshes in the spec. The following properties are implemented: ``sites``,
+``geoms``, ``joints``, ``lights``, ``cameras``, ``bodies``, ``frames``, ``materials``, ``meshes``, ``pairs``,
+``equalities``, ``tendons``, ``actuators``, ``skins``, ``textures``, ``texts``, ``tuples``, ``flexes``, ``hfields``,
+``keys``, ``numerics``, ``excludes``, ``sensors``, ``plugins``.
 
 Tree traversal
 ^^^^^^^^^^^^^^
@@ -611,8 +614,9 @@ Recursive search:
   ``body.find_all(mujoco.mjtObj.mjOBJ_SITE)`` or ``body.find_all('site')`` will return a list of all sites under the
   body.
 
-Additionally, the parent body of a given element - including bodies and frames - can be accessed via the ``parent``
-property. For example, the parent of a site can be accessed via ``site.parent``.
+Parent:
+  The parent body of a given element -- including bodies and frames -- can be accessed via the ``parent`` property.
+  For example, the parent of a site can be accessed via ``site.parent``.
 
 Relationship to ``PyMJCF``
 --------------------------

@@ -9,6 +9,7 @@ Upcoming version (not yet released)
 Feature promotion
 ^^^^^^^^^^^^^^^^^
 .. youtube:: qJFbx-FR7Bc
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -24,6 +25,8 @@ Feature promotion
 
 General
 ^^^^^^^
+- Add support for custom plots in the MuJoCo viewer by exposing a ``viewport`` property, a ``set_figures`` method,
+  and a ``clear_figures`` method.
 - Separate collision and deformation meshes for :ref:`flex<deformable-flex>`. This enables a fixed cost for the soft
   body computations, while preserving the fidelity of high-resolution collisions.
 - Added :ref:`mjs_setDeepCopy` API function. When the deep copy flag is 0, attaching a model will not copy it to the
@@ -31,6 +34,19 @@ General
   behavior is to perform such a shallow copy. The old behavior of creating a deep copy of the child model while
   attaching can be restored by setting the deep copy flag to 1.
 - Added :ref:`potential<sensor-e_potential>` and :ref:`kinetic<sensor-e_kinetic>` energy sensors.
+- Improved shadow rendering in the native renderer.
+
+.. admonition:: Breaking API changes
+   :class: attention
+
+   - Changes to inertia inference from meshes:
+
+     Previously, in order to specify that the mass lies on the surface, :ref:`geom/shellinertia<body-geom-shellinertia>`
+     could be used for any geom type. Now this attribute is ignored if the geom is a mesh; instead, inertia inference
+     for meshes is specified in the asset, using the :ref:`asset/mesh/inertia<asset-mesh-inertia>` attribute.
+
+     Previously, if the volumetric inertia computation failed (for example due to a very flat mesh), the compiler
+     would silently fall back to surface inertia computation. Now, the compiler will throw an informative error.
 
 MJX
 ^^^
@@ -147,6 +163,7 @@ General
 ^^^^^^^
 
 .. youtube:: e8lUuykQPGs
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -206,6 +223,7 @@ General
    welcome to experiment with it and report any issues.
 
 .. youtube:: kcM_oauk3ZA
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -350,6 +368,7 @@ General
    speed and memory footprint.
 
 .. youtube:: ZXBTEIDWHhs
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -438,6 +457,7 @@ General
 ^^^^^^^
 
 .. youtube:: 5k0_wsIRAFc
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -542,6 +562,7 @@ Python bindings
 ^^^^^^^^^^^^^^^
 
 .. youtube:: xHDS0n5DpqM
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -706,6 +727,7 @@ General
    ``qfrc_{spring, damper, gravcomp, fluid}``. The sum of these vectors equals ``qfrc_passive``.
 
 .. youtube:: H9qG9Zf2W44
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -769,6 +791,7 @@ Documentation
 ^^^^^^^^^^^^^
 
 .. youtube:: cE3s_IfO4g4
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -800,6 +823,7 @@ New features
            :target: https://colab.research.google.com/github/google-deepmind/mujoco/blob/main/mjx/tutorial.ipynb
 
 .. youtube:: QewlEqIZi1o
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -810,6 +834,7 @@ New features
      gradient at query points. See the :ref:`documentation<exWriting>` for more details.
 
 .. youtube:: ra2bTiZHGlw
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -830,6 +855,7 @@ New features
    this functionality to be unified in the future.
 
 .. youtube:: Vc1tq0fFvQA
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -958,6 +984,7 @@ Simulate
 ^^^^^^^^
 
 .. youtube:: YSvWn_poqWs
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -972,6 +999,7 @@ Documentation
 ^^^^^^^^^^^^^
 
 .. youtube:: nljr0X79vI0
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -1070,6 +1098,7 @@ Simulate
 ^^^^^^^^
 
 .. youtube:: mXVPbppGk5I
+   :aspect: 16:7
    :align: right
    :width: 240px
 
@@ -1443,6 +1472,7 @@ General
    See the :ref:`Memory allocation <CSize>` section for details.
 
    .. youtube:: RHnXD6uO3Mg
+      :aspect: 16:7
       :align: right
       :height: 150px
 
@@ -1530,6 +1560,7 @@ General
 ^^^^^^^
 
 .. youtube:: BcHZ5BFeTmU
+   :aspect: 16:7
    :align: right
    :height: 150px
 
@@ -1546,6 +1577,7 @@ General
    different uses of new weld attributes.
 
    .. youtube:: s-0JHanqV1A
+      :aspect: 16:7
       :align: right
       :height: 150px
 

@@ -438,16 +438,16 @@ class BindData(object):
         return name
       else:
         raise AttributeError('ctrl is not available for this type')
-    if name == 'qpos':
+    if name == 'qpos' or name == 'qvel':
       if self.prefix == 'jnt_':
         return name
       else:
-        raise AttributeError('qpos is not available for this type')
+        raise AttributeError('qpos and qvel are not available for this type')
     else:
       return self.prefix + name
 
   def __getattr__(self, name: str):
-    if name == 'sensordata' or name == 'qpos':
+    if name in ('sensordata', 'qpos', 'qvel'):
       adr = num = 0
       if name == 'sensordata':
         adr = self.model.sensor_adr[self.id]
@@ -455,12 +455,11 @@ class BindData(object):
       elif name == 'qpos':
         adr = self.model.jnt_qposadr[self.id]
         typ = self.model.jnt_type[self.id]
-        num = (
-            (typ == JointType.FREE) * JointType.FREE.qpos_width()
-            + (typ == JointType.BALL) * JointType.BALL.qpos_width()
-            + (typ == JointType.HINGE) * JointType.HINGE.qpos_width()
-            + (typ == JointType.SLIDE) * JointType.SLIDE.qpos_width()
-        )
+        num = sum((typ == jt) * jt.qpos_width() for jt in JointType)
+      elif name == 'qvel':
+        adr = self.model.jnt_dofadr[self.id]
+        typ = self.model.jnt_type[self.id]
+        num = sum((typ == jt) * jt.dof_width() for jt in JointType)
       if isinstance(self.id, list):
         idx = []
         for a, n in zip(adr, num):
@@ -477,6 +476,7 @@ class BindData(object):
     if name == 'sensordata':
       raise AttributeError('sensordata is readonly')
     array = getattr(self.data, self.__getname(name))
+    dim = 1 if len(array.shape) == 1 else array.shape[-1]
     try:
       iter(value)
     except TypeError:
@@ -484,18 +484,17 @@ class BindData(object):
     if name == 'qpos':
       adr = self.model.jnt_qposadr[self.id]
       typ = self.model.jnt_type[self.id]
-      num = (
-          (typ == JointType.FREE) * JointType.FREE.qpos_width()
-          + (typ == JointType.BALL) * JointType.BALL.qpos_width()
-          + (typ == JointType.HINGE) * JointType.HINGE.qpos_width()
-          + (typ == JointType.SLIDE) * JointType.SLIDE.qpos_width()
-      )
+      num = sum((typ == jt) * jt.qpos_width() for jt in JointType)
+    elif name == 'qvel':
+      adr = self.model.jnt_dofadr[self.id]
+      typ = self.model.jnt_type[self.id]
+      num = sum((typ == jt) * jt.dof_width() for jt in JointType)
     elif isinstance(self.id, list):
       adr = self.id
-      num = [1 for _ in range(len(self.id))]
+      num = [dim for _ in range(len(self.id))]
     else:
       adr = [self.id]
-      num = [1]
+      num = [dim]
     i = 0
     for a, n in zip(adr, num):
       array = array.at[a: a + n].set(value[i: i + n])

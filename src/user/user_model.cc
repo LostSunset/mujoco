@@ -2793,8 +2793,8 @@ void mjCModel::CopyObjects(mjModel* m) {
     m->mesh_bvhnum[i] = pme->tree().Nbvh();
     m->mesh_bvhadr[i] = pme->tree().Nbvh() ? bvh_adr : -1;
     mjuu_copyvec(&m->mesh_scale[3 * i], pme->Scale(), 3);
-    mjuu_copyvec(&m->mesh_pos[3 * i], pme->GetOffsetPosPtr(), 3);
-    mjuu_copyvec(&m->mesh_quat[4 * i], pme->GetOffsetQuatPtr(), 4);
+    mjuu_copyvec(&m->mesh_pos[3 * i], pme->GetPosPtr(), 3);
+    mjuu_copyvec(&m->mesh_quat[4 * i], pme->GetQuatPtr(), 4);
 
     // copy vertices, normals, faces, texcoords, aux data
     pme->CopyVert(m->mesh_vert + 3*vert_adr);
@@ -4249,7 +4249,7 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
     if (geoms_[i]->mesh &&
         (geoms_[i]->spec.type == mjGEOM_MESH || geoms_[i]->spec.type == mjGEOM_SDF) &&
         (geoms_[i]->spec.contype || geoms_[i]->spec.conaffinity ||
-         geoms_[i]->mesh->spec.inertia == mjINERTIA_CONVEX)) {
+         geoms_[i]->mesh->spec.inertia == mjMESH_INERTIA_CONVEX)) {
       geoms_[i]->mesh->SetNeedHull(true);
     }
   }
@@ -4319,33 +4319,11 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
     }
   }
 
-  // check body mass and inertia
-  for (int i=1; i<bodies_.size(); i++) {
-    mjCBody* b = bodies_[i];
-
-    // find moving body with small mass or inertia
-    if (!b->joints.empty() &&
-        (b->mass<mjMINVAL ||
-          b->inertia[0]<mjMINVAL ||
-          b->inertia[1]<mjMINVAL ||
-          b->inertia[2]<mjMINVAL)) {
-      // does it have static children with mass and inertia
-      bool ok = false;
-      for (size_t j=0; j<b->bodies.size(); j++) {
-        if (b->bodies[j]->joints.empty() &&
-            b->bodies[j]->mass>=mjMINVAL &&
-            b->bodies[j]->inertia[0]>=mjMINVAL &&
-            b->bodies[j]->inertia[1]>=mjMINVAL &&
-            b->bodies[j]->inertia[2]>=mjMINVAL) {
-          ok = true;
-          break;
-        }
-      }
-
-      // error
-      if (!ok) {
-        throw mjCError(b, "mass and inertia of moving bodies must be larger than mjMINVAL");
-      }
+  // check mass and inertia of moving bodies
+  if (bodies_.size() > 1) {
+    // we ignore the first body as it is the world body
+    if (!CheckBodiesMassInertia(std::vector<mjCBody*>(bodies_.begin()+1, bodies_.end()))) {
+      throw mjCError(0, "mass and inertia of moving bodies must be larger than mjMINVAL");
     }
   }
 
@@ -4497,6 +4475,46 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
 
 
 
+bool mjCModel::CheckBodiesMassInertia(std::vector<mjCBody*> bodies) {
+  // check mass and inertia of moving bodies
+  for (int i=0; i<bodies.size(); i++) {
+    if (!bodies[i]->joints.empty()) {
+      if (!CheckBodyMassInertia(bodies[i])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+
+
+bool mjCModel::CheckBodyMassInertia(mjCBody* body) {
+  // check if body has valid mass and inertia
+  if (body->mass>=mjMINVAL &&
+      body->inertia[0]>=mjMINVAL &&
+      body->inertia[1]>=mjMINVAL &&
+      body->inertia[2]>=mjMINVAL) {
+      return true;
+    }
+
+  // body is valid if we find a single static child with valid mass and inertia
+  for (int i=0; i<body->Bodies().size(); i++) {
+    // if we find a child with a joint, time to move on to the next moving body
+    if (!body->Bodies()[i]->joints.empty()) {
+      continue;
+    }
+    if (CheckBodyMassInertia(body->Bodies()[i])) {
+      return true;
+    }
+  }
+
+  // we did not find a child with valid mass and inertia
+  return false;
+}
+
+
+
 //------------------------------- DECOMPILER -------------------------------------------------------
 
 // get numeric data back from mjModel
@@ -4633,8 +4651,8 @@ bool mjCModel::CopyBack(const mjModel* m) {
   mjCMesh* pm;
   for (int i=0; i<nmesh; i++) {
     pm = meshes_[i];
-    mjuu_copyvec(pm->GetOffsetPosPtr(), m->mesh_pos+3*i, 3);
-    mjuu_copyvec(pm->GetOffsetQuatPtr(), m->mesh_quat+4*i, 4);
+    mjuu_copyvec(pm->GetPosPtr(), m->mesh_pos+3*i, 3);
+    mjuu_copyvec(pm->GetQuatPtr(), m->mesh_quat+4*i, 4);
   }
 
   // heightfield
