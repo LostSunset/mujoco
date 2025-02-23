@@ -13,12 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 """Engine support functions."""
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Optional, Tuple, Union
 
 import jax
 from jax import numpy as jp
 import mujoco
+from mujoco.introspect import mjxmacro
 from mujoco.mjx._src import math
 from mujoco.mjx._src import scan
 # pylint: disable=g-importing-member
@@ -291,10 +292,7 @@ class BindModel(object):
 
   def __init__(self, model: Model, specs: Sequence[mujoco.MjStruct]):
     self.model = model
-    try:
-      iter(specs)
-    except TypeError:
-      specs = [specs]
+    self.prefix = ''
     ids = []
     for spec in specs:
       if isinstance(spec, mujoco.MjsBody):
@@ -367,14 +365,27 @@ class BindModel(object):
     else:
       self.id = ids
 
+  def _slice(self, name: str, idx: Union[int, slice, Sequence[int]]):
+    _, expected_dim = mjxmacro.MJMODEL[name]
+    var = getattr(self.model, name)
+    if expected_dim == '1':
+      return var[..., idx]
+    elif expected_dim == '9':
+      return var[..., idx, :, :]
+    return var[..., idx, :]
+
   def __getattr__(self, name: str):
-    return getattr(self.model, self.prefix + name)[self.id, ...]
+    return self._slice(self.prefix + name, self.id)
 
 
 def _bind_model(
-    self: Model, obj: Sequence[mujoco.MjStruct]
+    self: Model, obj: mujoco.MjStruct | Iterable[mujoco.MjStruct]
 ) -> BindModel:
   """Bind a Mujoco spec to an MJX Model."""
+  if isinstance(obj, mujoco.MjStruct):
+    obj = (obj,)
+  else:
+    obj = tuple(obj)
   return BindModel(self, obj)
 
 
@@ -386,14 +397,10 @@ class BindData(object):
   ):
     self.data = data
     self.model = model
-    try:
-      iter(specs)
-    except TypeError:
-      specs = [specs]
+    self.prefix = ''
     ids = []
     for spec in specs:
       if isinstance(spec, mujoco.MjsBody):
-        self.prefix = ''
         idx = name2id(model, mujoco.mjtObj.mjOBJ_BODY, spec.name)
       elif isinstance(spec, mujoco.MjsJoint):
         self.prefix = 'jnt_'
@@ -433,21 +440,36 @@ class BindData(object):
       self.id = ids
 
   def __getname(self, name: str):
+    """Get the name of the attribute and check if the type is correct."""
+    if name == 'sensordata':
+      if self.prefix == 'sensor_':
+        return name
+      else:
+        raise AttributeError('sensordata is not available for this type')
     if name == 'ctrl':
       if self.prefix == 'actuator_':
         return name
       else:
         raise AttributeError('ctrl is not available for this type')
-    if name == 'qpos' or name == 'qvel':
+    if name == 'qpos' or name == 'qvel' or name == 'qacc':
       if self.prefix == 'jnt_':
         return name
       else:
-        raise AttributeError('qpos and qvel are not available for this type')
+        raise AttributeError('qpos, qvel, qacc are not available for this type')
     else:
       return self.prefix + name
 
+  def _slice(self, name: str, idx: Union[int, slice, Sequence[int]]):
+    _, expected_dim = mjxmacro.MJDATA[name]
+    var = getattr(self.data, name)
+    if expected_dim == '1':
+      return var[..., idx]
+    elif expected_dim == '9':
+      return var[..., idx, :, :]
+    return var[..., idx, :]
+
   def __getattr__(self, name: str):
-    if name in ('sensordata', 'qpos', 'qvel'):
+    if name in ('sensordata', 'qpos', 'qvel', 'qacc'):
       adr = num = 0
       if name == 'sensordata':
         adr = self.model.sensor_adr[self.id]
@@ -456,7 +478,7 @@ class BindData(object):
         adr = self.model.jnt_qposadr[self.id]
         typ = self.model.jnt_type[self.id]
         num = sum((typ == jt) * jt.qpos_width() for jt in JointType)
-      elif name == 'qvel':
+      elif name == 'qvel' or name == 'qacc':
         adr = self.model.jnt_dofadr[self.id]
         typ = self.model.jnt_type[self.id]
         num = sum((typ == jt) * jt.dof_width() for jt in JointType)
@@ -464,12 +486,12 @@ class BindData(object):
         idx = []
         for a, n in zip(adr, num):
           idx.extend(a + j for j in range(n))
-        return getattr(self.data, name)[idx, ...]
+        return self._slice(self.__getname(name), idx)
       elif num > 1:
-        return getattr(self.data, name)[adr : adr + num, ...]
+        return self._slice(self.__getname(name), slice(adr, adr + num))
       else:
-        return getattr(self.data, name)[adr, ...]
-    return getattr(self.data, self.__getname(name))[self.id, ...]
+        return self._slice(self.__getname(name), adr)
+    return self._slice(self.__getname(name), self.id)
 
   def set(self, name: str, value: jax.Array) -> Data:
     """Set the value of an array in an MJX Data."""
@@ -485,27 +507,32 @@ class BindData(object):
       adr = self.model.jnt_qposadr[self.id]
       typ = self.model.jnt_type[self.id]
       num = sum((typ == jt) * jt.qpos_width() for jt in JointType)
-    elif name == 'qvel':
+    elif name == 'qvel' or name == 'qacc':
       adr = self.model.jnt_dofadr[self.id]
       typ = self.model.jnt_type[self.id]
       num = sum((typ == jt) * jt.dof_width() for jt in JointType)
     elif isinstance(self.id, list):
-      adr = self.id
+      adr = self.id * dim
       num = [dim for _ in range(len(self.id))]
     else:
-      adr = [self.id]
+      adr = [self.id * dim]
       num = [dim]
     i = 0
     for a, n in zip(adr, num):
-      array = array.at[a: a + n].set(value[i: i + n])
+      shape = array.shape
+      array = array.flatten().at[a : a + n].set(value[i : i + n]).reshape(shape)
       i += n
     return self.data.replace(**{self.__getname(name): array})
 
 
 def _bind_data(
-    self: Data, model: Model, obj: Sequence[mujoco.MjStruct]
+    self: Data, model: Model, obj: mujoco.MjStruct | Iterable[mujoco.MjStruct]
 ) -> BindData:
   """Bind a Mujoco spec to an MJX Data."""
+  if isinstance(obj, mujoco.MjStruct):
+    obj = (obj,)
+  else:
+    obj = tuple(obj)
   return BindData(self, model, obj)
 
 

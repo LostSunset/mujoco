@@ -3696,6 +3696,9 @@ void mjCHField::Compile(const mjVFS* vfs) {
 
   // copy userdata into data
   if (!userdata_.empty()) {
+    if (nrow*ncol != userdata_.size()) {
+      throw mjCError(this, "elevation data length must match nrow*ncol");
+    }
     data.assign(nrow*ncol, 0);
     if (data.empty()) {
       throw mjCError(this, "could not allocate buffers in hfield");
@@ -5410,9 +5413,13 @@ const mjCWrap* mjCTendon::GetWrap(int i) const {
 
 void mjCTendon::ResolveReferences(const mjCModel* m) {
   int nfailure = 0;
+  int npulley = 0;
   for (int i=0; i<path.size(); i++) {
     std::string pname = path[i]->name;
     std::string psidesite = path[i]->sidesite;
+    if (path[i]->type == mjWRAP_PULLEY) {
+      npulley++;
+    }
     try {
       // look for wrapped element with namespace
       path[i]->name = prefix + pname + suffix;
@@ -5426,7 +5433,7 @@ void mjCTendon::ResolveReferences(const mjCModel* m) {
       nfailure++;
     }
   }
-  if (nfailure==path.size()) {
+  if (nfailure==path.size()-npulley) {
     throw mjCError(this, "tendon '%s' (id = %d): no attached reference found", name.c_str(), id);
   }
   prefix.clear();
