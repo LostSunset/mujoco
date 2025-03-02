@@ -16,7 +16,7 @@
 #define MUJOCO_MUJOCO_H_
 
 // header version; should match the library version as returned by mj_version()
-#define mjVERSION_HEADER 328
+#define mjVERSION_HEADER 331
 
 // needed to define size_t, fabs and log10
 #include <stdlib.h>
@@ -1425,6 +1425,10 @@ MJAPI mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
 // Attach child body to a parent site, return the attached body if success or NULL otherwise.
 MJAPI mjsBody* mjs_attachToSite(mjsSite* parent, const mjsBody* child,
                                 const char* prefix, const char* suffix);
+
+// Attach child frame to a parent site, return the attached frame if success or NULL otherwise.
+MJAPI mjsFrame* mjs_attachFrameToSite(mjsSite* parent, const mjsFrame* child,
+                                      const char* prefix, const char* suffix);
 
 // Detach body from mjSpec, remove all references and delete the body, return 0 on success.
 MJAPI int mjs_detachBody(mjSpec* s, mjsBody* b);

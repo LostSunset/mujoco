@@ -917,8 +917,10 @@ mjCBody& mjCBody::operator+=(const mjCFrame& other) {
   CopyList(lights, subtree->lights, fmap, &other);
 
   if (!model->deepcopy_) {
+    std::string name = subtree->name;
     subtree->SetModel(model);
     subtree->NameSpace(other_model);
+    subtree->name = name;
   }
 
   int nbodies = (int)subtree->bodies.size();
@@ -7155,6 +7157,11 @@ void mjCPlugin::Compile(void) {
                   it->second.size() + 1);
       config_attribs_copy.erase(it);
     }
+  }
+
+  // if there are no attributes, add a null terminator
+  if (plugin->nattribute == 0) {
+    flattened_attributes.push_back('\0');
   }
 
   // anything left in xml_attributes at this stage is not a valid attribute

@@ -158,6 +158,10 @@ void mjXWriter::OneFlex(XMLElement* elem, const mjCFlex* flex) {
     text = VectorToString(flex->get_texcoord());
     WriteAttrTxt(elem, "texcoord", text);
   }
+  if (!flex->get_facetexcoord().empty()) {
+    text = VectorToString(flex->get_facetexcoord());
+    WriteAttrTxt(elem, "facetexcoord", text);
+  }
   if (!flex->get_nodebody().empty()) {
     text = VectorToString(flex->get_nodebody());
     WriteAttrTxt(elem, "node", text);
@@ -1028,6 +1032,7 @@ void mjXWriter::Option(XMLElement* root) {
     WRITEDSBL("midphase",       mjDSBL_MIDPHASE)
     WRITEDSBL("eulerdamp",      mjDSBL_EULERDAMP)
     WRITEDSBL("autoreset",      mjDSBL_AUTORESET)
+    WRITEDSBL("nativeccd",      mjDSBL_NATIVECCD)
 #undef WRITEDSBL
 
 #define WRITEENBL(NAME, MASK) \
@@ -1039,7 +1044,6 @@ void mjXWriter::Option(XMLElement* root) {
     WRITEENBL("invdiscrete",    mjENBL_INVDISCRETE)
     WRITEENBL("multiccd",       mjENBL_MULTICCD)
     WRITEENBL("island",         mjENBL_ISLAND)
-    WRITEENBL("nativeccd",      mjENBL_NATIVECCD)
 #undef WRITEENBL
   }
 

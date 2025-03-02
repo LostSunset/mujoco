@@ -499,16 +499,11 @@ Returns the smallest signed distance between two geoms and optionally the segmen
 Returned distances are bounded from above by ``distmax``. |br| If no collision of distance smaller than ``distmax`` is
 found, the function will return ``distmax`` and ``fromto``, if given, will be set to (0, 0, 0, 0, 0, 0).
 
-.. admonition:: Positive ``distmax`` values
-   :class: note
+   .. admonition:: different (correct) behavior under `nativeccd`
+      :class: note
 
-   .. TODO: b/339596989 - Improve mjc_Convex.
-
-   For some colliders, a large, positive ``distmax`` will result in an accurate measurement. However, for collision
-   pairs which use the general ``mjc_Convex`` collider, the result will be approximate and likely inaccurate.
-   This is considered a bug to be fixed in a future release.
-   In order to determine whether a geom pair uses ``mjc_Convex``, inspect the table at the top of
-   `engine_collision_driver.c <https://github.com/google-deepmind/mujoco/blob/main/src/engine/engine_collision_driver.c>`__.
+      As explained in :ref:`Collision Detection<coDistance>`, distances are inaccurate when using the
+      :ref:`legacy CCD pipeline<coCCD>`, and its use is discouraged.
 
 .. _mj_contactForce:
 
@@ -3835,6 +3830,15 @@ Attach child frame to a parent body, return the attached frame if success or NUL
 .. mujoco-include:: mjs_attachToSite
 
 Attach child body to a parent site, return the attached body if success or NULL otherwise.
+
+.. _mjs_attachFrameToSite:
+
+`mjs_attachFrameToSite <#mjs_attachFrameToSite>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_attachFrameToSite
+
+Attach child frame to a parent site, return the attached frame if success or NULL otherwise.
 
 .. _mjs_detachBody:
 

@@ -33,38 +33,38 @@
 // call libccd or nativeccd to recover penetration info
 static int mjc_penetration(const mjModel* m, mjCCDObj* obj1, mjCCDObj* obj2,
                            const ccd_t* ccd, ccd_real_t* depth, ccd_vec3_t* dir, ccd_vec3_t* pos) {
-  if (mjENABLED(mjENBL_NATIVECCD)) {
-    mjCCDConfig config;
-    mjCCDStatus status;
-
-    // set config
-    config.max_iterations = ccd->max_iterations,
-    config.tolerance = ccd->mpr_tolerance,
-    config.max_contacts = 1;
-    config.dist_cutoff = 0;  // no geom distances needed
-
-    mjtNum dist = mjc_ccd(&config, &status, obj1, obj2);
-    if (dist < 0) {
-      if (depth) *depth = -dist;
-      if (dir) {
-        mju_sub3(dir->v, status.x1, status.x2);
-        mju_normalize3(dir->v);
-      }
-      if (pos) {
-        pos->v[0] = 0.5 * (status.x1[0] + status.x2[0]);
-        pos->v[1] = 0.5 * (status.x1[1] + status.x2[1]);
-        pos->v[2] = 0.5 * (status.x1[2] + status.x2[2]);
-      }
-      return 0;
-    }
-    if (depth) *depth = 0;
-    if (dir) mju_zero3(dir->v);
-    if (pos) mju_zero3(dir->v);
-    return 1;
+  // fallback to MPR
+  if (mjDISABLED(mjDSBL_NATIVECCD)) {
+    return ccdMPRPenetration(obj1, obj2, ccd, depth, dir, pos);
   }
 
-  // fallback to MPR
-  return ccdMPRPenetration(obj1, obj2, ccd, depth, dir, pos);
+  mjCCDConfig config;
+  mjCCDStatus status;
+
+  // set config
+  config.max_iterations = ccd->max_iterations,
+  config.tolerance = ccd->mpr_tolerance,
+  config.max_contacts = 1;
+  config.dist_cutoff = 0;  // no geom distances needed
+
+  mjtNum dist = mjc_ccd(&config, &status, obj1, obj2);
+  if (dist < 0) {
+    if (depth) *depth = -dist;
+    if (dir) {
+      mju_sub3(dir->v, status.x1, status.x2);
+      mju_normalize3(dir->v);
+    }
+    if (pos) {
+      pos->v[0] = 0.5 * (status.x1[0] + status.x2[0]);
+      pos->v[1] = 0.5 * (status.x1[1] + status.x2[1]);
+      pos->v[2] = 0.5 * (status.x1[2] + status.x2[2]);
+    }
+    return 0;
+  }
+  if (depth) *depth = 0;
+  if (dir) mju_zero3(dir->v);
+  if (pos) mju_zero3(dir->v);
+  return 1;
 }
 
 
@@ -791,7 +791,7 @@ static void mjc_initCCD(ccd_t* ccd, const mjModel* m) {
 // find convex-convex collision
 static int mjc_CCDIteration(const mjModel* m, const mjData* d, mjCCDObj* obj1, mjCCDObj* obj2,
                             mjContact* con, int max_contacts, mjtNum margin) {
-  if (mjENABLED(mjENBL_NATIVECCD)) {
+  if (!mjDISABLED(mjDSBL_NATIVECCD)) {
     mjCCDConfig config;
     mjCCDStatus status;
 
@@ -889,6 +889,28 @@ static void mju_rotateFrame(const mjtNum origin[3], const mjtNum rot[9],
 
 
 
+// return true if multiccd can run in a single pass
+static int singlePass(const mjCCDObj* obj1, const mjCCDObj* obj2) {
+  const mjModel* m = obj1->model;
+
+  // single pass not supported for margins
+  if (obj1->margin > 0 || obj2->margin > 0) {
+    return 0;
+  }
+
+  // supported geoms for single pass
+  int type1 = m->geom_type[obj1->geom];
+  int type2 = m->geom_type[obj2->geom];
+  if (type1 == mjGEOM_BOX || type1 == mjGEOM_MESH) {
+    if (type2 == mjGEOM_BOX || type2 == mjGEOM_MESH) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+
 // multi-point convex-convex collision, using libccd
 int mjc_Convex(const mjModel* m, const mjData* d,
                mjContact* con, int g1, int g2, mjtNum margin) {
@@ -897,17 +919,16 @@ int mjc_Convex(const mjModel* m, const mjData* d,
   mjc_initCCDObj(&obj1, m, d, g1, margin);
   mjc_initCCDObj(&obj2, m, d, g2, margin);
   int max_contacts = 1;
-  if (mjENABLED(mjENBL_MULTICCD)) {
-    // TODO(kylebayes): Support contact pruning.
-    max_contacts = 8;
+
+  if (mjENABLED(mjENBL_MULTICCD) && singlePass(&obj1, &obj2)) {
+    max_contacts = 4;
   }
 
   // find initial contact
   int ncon = mjc_CCDIteration(m, d, &obj1, &obj2, con, max_contacts, margin);
 
   // nativeccd supports multi Box-Box collision directly
-  if (mjENABLED(mjENBL_NATIVECCD) && m->geom_type[g1] == mjGEOM_BOX
-      && m->geom_type[g2] == mjGEOM_BOX) {
+  if (!mjDISABLED(mjDSBL_NATIVECCD) && singlePass(&obj1, &obj2)) {
     return ncon;
   }
 
