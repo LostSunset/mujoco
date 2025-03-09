@@ -359,7 +359,8 @@ void mjuu_crossvec(double* a, const double* b, const double* c) {
 
 
 // compute normal vector to given triangle, return length
-double mjuu_makenormal(double* normal, const float* a, const float* b, const float* c) {
+template<typename T> double mjuu_makenormal(double* normal, const T a[3],
+                                            const T b[3], const T c[3]) {
   double v1[3] = {a[0], a[1], a[2]};
   double v2[3] = {b[0], b[1], b[2]};
   double v3[3] = {c[0], c[1], c[2]};
@@ -379,6 +380,10 @@ double mjuu_makenormal(double* normal, const float* a, const float* b, const flo
   return nrm;
 }
 
+template double mjuu_makenormal(double* normal, const double a[3],
+                                const double b[3], const double c[3]);
+template double mjuu_makenormal(double* normal, const float a[3],
+                                const float b[3], const float c[3]);
 
 // compute quaternion as minimal rotation from [0;0;1] to vec
 void mjuu_z2quat(double* quat, const double* vec) {
@@ -530,9 +535,9 @@ void mjuu_offcenter(double* res, const double mass, const double* vec) {
 void mjuu_visccoef(double* visccoef, double mass, const double* inertia, double scl) {
   // compute equivalent box
   double ebox[3];
-  ebox[0] = sqrt(mjMAX(mjEPS, (inertia[1] + inertia[2] - inertia[0])) / mass * 6.0);
-  ebox[1] = sqrt(mjMAX(mjEPS, (inertia[0] + inertia[2] - inertia[1])) / mass * 6.0);
-  ebox[2] = sqrt(mjMAX(mjEPS, (inertia[0] + inertia[1] - inertia[2])) / mass * 6.0);
+  ebox[0] = sqrt(std::max(mjEPS, (inertia[1] + inertia[2] - inertia[0])) / mass * 6.0);
+  ebox[1] = sqrt(std::max(mjEPS, (inertia[0] + inertia[2] - inertia[1])) / mass * 6.0);
+  ebox[2] = sqrt(std::max(mjEPS, (inertia[0] + inertia[1] - inertia[2])) / mass * 6.0);
 
   // apply formula for box (or rather cross) viscosity
 

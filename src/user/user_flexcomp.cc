@@ -26,9 +26,7 @@
 
 #include <mujoco/mjmacro.h>
 #include <mujoco/mjmodel.h>
-#include <mujoco/mjtnum.h>
 #include <mujoco/mjplugin.h>
-#include <mujoco/mujoco.h>
 #include "cc/array_safety.h"
 #include "engine/engine_crossplatform.h"
 #include "engine/engine_util_errmem.h"
@@ -413,7 +411,7 @@ bool mjCFlexcomp::Make(mjsBody* body, char* error, int error_sz) {
   mjs_setString(pf->name, name.c_str());
   mjs_setInt(pf->elem, element.data(), element.size());
   mjs_setFloat(pf->texcoord, texcoord.data(), texcoord.size());
-  mjs_setInt(pf->facetexcoord, facetexcoord.data(), facetexcoord.size());
+  mjs_setInt(pf->elemtexcoord, elemtexcoord.data(), elemtexcoord.size());
   if (!centered) {
     mjs_setDouble(pf->vert, point.data(), point.size());
   }
@@ -991,14 +989,6 @@ bool mjCFlexcomp::MakeMesh(mjCModel* model, char* error, int error_sz) {
     return comperr(error, "File is required", error_sz);
   }
 
-  // get extension and check; must be STL, OBJ or MSH
-  std::string ext = mjuu_getext(file);
-  if (strcasecmp(ext.c_str(), ".stl") &&
-      strcasecmp(ext.c_str(), ".obj") &&
-      strcasecmp(ext.c_str(), ".msh")) {
-    return comperr(error, "Mesh file extension must be stl, obj or msh", error_sz);
-  }
-
   // check dim
   if (def.spec.flex->dim < 2) {
     return comperr(error, "Flex dim must be at least 2 for mesh", error_sz);
@@ -1008,6 +998,11 @@ bool mjCFlexcomp::MakeMesh(mjCModel* model, char* error, int error_sz) {
   std::string filename = mjuu_combinePaths(mjs_getString(model->spec.meshdir), file);
   mjResource* resource = nullptr;
 
+
+  if (mjCMesh::IsMSH(filename)) {
+    return comperr(error, "legacy MSH files are not supported in flexcomp", error_sz);
+  }
+
   try {
     resource = mjCBase::LoadResource(mjs_getString(model->spec.modelfiledir),
                                      filename, 0);
@@ -1015,50 +1010,28 @@ bool mjCFlexcomp::MakeMesh(mjCModel* model, char* error, int error_sz) {
     return comperr(error, err.message, error_sz);
   }
 
+
   // load mesh
   mjCMesh mesh;
-  bool isobj = false;
   try {
-    if (!strcasecmp(ext.c_str(), ".stl")) {
-      mesh.LoadSTL(resource);
-    } else if (!strcasecmp(ext.c_str(), ".obj")) {
-      isobj = true;
-      mesh.LoadOBJ(resource);
-    } else {
-      mesh.LoadMSH(resource);
-    }
+    mesh.LoadFromResource(resource, true);
     mju_closeResource(resource);
   } catch (mjCError err) {
     mju_closeResource(resource);
     return comperr(error, err.message, error_sz);
   }
 
-  // LoadOBJ uses userXXX, extra processing needed
-  if (isobj) {
-    // check sizes
-    if (mesh.Vert().empty() || mesh.Face().empty()) {
-      return comperr(error, "Vertex and face data required", error_sz);
-    }
-    if (mesh.Vert().size()%3) {
-      return comperr(error, "Vertex data must be multiple of 3", error_sz);
-    }
-    if (mesh.Face().size()%3) {
-      return comperr(error, "Face data must be multiple of 3", error_sz);
-    }
-
-    // remove repeated vertices (not called in LoadOBJ)
-    mesh.RemoveRepeated();
+  // check sizes
+  if (mesh.Vert().empty() || mesh.Face().empty()) {
+    return comperr(error, "Vertex and face data required", error_sz);
   }
 
-  // copy vertices, convert from float to double
-  point = vector<double> (mesh.nvert()*3);
-  for (int i=0; i < mesh.nvert()*3; i++) {
-    point[i] = (double) mesh.Vert(i);
-  }
+  // copy vertices
+  point = mesh.Vert();
 
   if (mesh.HasTexcoord()) {
     texcoord = mesh.Texcoord();
-    facetexcoord = mesh.FaceTexcoord();
+    elemtexcoord = mesh.FaceTexcoord();
   }
 
   // copy faces or create 3D mesh

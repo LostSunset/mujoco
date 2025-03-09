@@ -15,6 +15,7 @@
 #ifndef MUJOCO_SRC_USER_USER_OBJECTS_H_
 #define MUJOCO_SRC_USER_USER_OBJECTS_H_
 
+#include <stdbool.h>
 #include <cstddef>
 #include <array>
 #include <cstdlib>
@@ -25,9 +26,6 @@
 #include <utility>
 #include <vector>
 
-#include <mujoco/mjtnum.h>
-#include <mujoco/mjmodel.h>
-#include <mujoco/mjplugin.h>
 #include <mujoco/mjspec.h>
 #include "user/user_cache.h"
 #include "user/user_util.h"
@@ -198,7 +196,7 @@ class mjCBase : public mjCBase_ {
 
   // Get and sanitize content type from raw_text if not empty, otherwise parse
   // content type from resource_name; throw on failure
-  std::string GetAssetContentType(std::string_view resource_name, std::string_view raw_text);
+  static std::string GetAssetContentType(std::string_view resource_name, std::string_view raw_text);
 
   // Add frame transformation
   void SetFrame(mjCFrame* _frame);
@@ -776,7 +774,7 @@ class mjCFlex_ : public mjCBase {
   std::vector<double> node_;              // node positions
   std::vector<int> elem_;                 // element vertex ids
   std::vector<float> texcoord_;           // vertex texture coordinates
-  std::vector<int> facetexcoord_;         // face texture coordinates (OBJ only)
+  std::vector<int> elemtexcoord_;         // face texture coordinates (OBJ only)
   std::string material_;                  // name of material used for rendering
 
   std::string spec_material_;
@@ -786,7 +784,7 @@ class mjCFlex_ : public mjCBase {
   std::vector<double> spec_node_;
   std::vector<int> spec_elem_;
   std::vector<float> spec_texcoord_;
-  std::vector<int> spec_facetexcoord_;
+  std::vector<int> spec_elemtexcoord_;
 };
 
 class mjCFlex: public mjCFlex_, private mjsFlex {
@@ -817,7 +815,7 @@ class mjCFlex: public mjCFlex_, private mjsFlex {
   const std::vector<double>& get_elemaabb() const { return elemaabb_; }
   const std::vector<int>& get_elem() const { return elem_; }
   const std::vector<float>& get_texcoord() const { return texcoord_; }
-  const std::vector<int>& get_facetexcoord() const { return facetexcoord_; }
+  const std::vector<int>& get_elemtexcoord() const { return elemtexcoord_; }
   const std::vector<std::string>& get_nodebody() const { return nodebody_; }
 
   bool HasTexcoord() const;               // texcoord not null
@@ -845,9 +843,10 @@ class mjCMesh_ : public mjCBase {
   std::string plugin_name;
   std::string plugin_instance_name;
 
-  std::string content_type_;                     // content type of file
+  std::string content_type_ = "";                // content type of file
   std::string file_;                             // mesh file
-  std::vector<float> vert_;                      // vertex data
+  mjResource* resource_ = nullptr;               // resource for mesh file
+  std::vector<double> vert_;                      // vertex data
   std::vector<float> normal_;                    // normal data
   std::vector<float> texcoord_;                  // texcoord data
   std::vector<int> face_;                        // vertex indices
@@ -889,7 +888,7 @@ class mjCMesh_ : public mjCBase {
   double surface_;                    // surface of the mesh
 
   // size of mesh data to be copied into mjModel
-  int szgraph_;                       // size of graph data in ints
+  int szgraph_ = 0;                   // size of graph data in ints
   bool needhull_;                     // needs convex hull for collisions
   int maxhullvert_;                   // max vertex count of convex hull
 
@@ -926,8 +925,8 @@ class mjCMesh: public mjCMesh_, private mjsMesh {
   const double* Refquat() const { return refquat; }
   const double* Scale() const { return scale; }
   bool SmoothNormal() const { return smoothnormal; }
-  const std::vector<float>& Vert() const { return vert_; }
-  float Vert(int i) const { return vert_[i]; }
+  const std::vector<double>& Vert() const { return vert_; }
+  double Vert(int i) const { return vert_[i]; }
   const std::vector<float>& UserVert() const { return spec_vert_; }
   const std::vector<float>& UserNormal() const { return spec_normal_; }
   const std::vector<float>& Texcoord() const { return texcoord_; }
@@ -1000,18 +999,33 @@ class mjCMesh: public mjCMesh_, private mjsMesh {
   // sets properties of a bounding volume given a face id
   void SetBoundingVolume(int faceid);
 
-  void LoadOBJ(mjResource* resource);  // load mesh in wavefront OBJ format
-  void LoadSTL(mjResource* resource);  // load mesh in STL BIN format
-  void LoadMSH(mjResource* resource);  // load mesh in MSH BIN format
+  // load from OBJ, STL, or MSH file; throws mjCError on failure
+  void LoadFromResource(mjResource* resource, bool remove_repeated = false);
 
-  void RemoveRepeated();               // remove repeated vertices
+  static bool IsObj(std::string_view filename, std::string_view ct = "");
+  static bool IsSTL(std::string_view filename, std::string_view ct = "");
+  static bool IsMSH(std::string_view filename, std::string_view ct = "");
+
+  bool IsObj() const;
+  bool IsSTL() const;
+  bool IsMSH() const;
 
  private:
+  void TryCompile(const mjVFS* vfs);
+
   // load mesh from cache asset, return true on success (OBJ files are only supported)
   bool LoadCachedMesh(mjCCache *cache, const mjResource* resource);
+
   // store mesh into asset cache (OBJ files are only supported)
-  void CacheMesh(mjCCache *cache, const mjResource* resource,
-                 std::string_view asset_type);
+  void CacheMesh(mjCCache *cache, const mjResource* resource);
+
+  // convert vertices to double precision and remove repeated vertices if requested
+  void ProcessVertices(const std::vector<float>& vert, bool remove_repeated = false);
+
+
+  void LoadOBJ(mjResource* resource, bool remove_repeated);  // load mesh in wavefront OBJ format
+  void LoadSTL(mjResource* resource);                        // load mesh in STL BIN format
+  void LoadMSH(mjResource* resource, bool remove_repeated);  // load mesh in MSH BIN format
 
   void LoadSDF();                               // generate mesh using marching cubes
   void MakeGraph();                             // make graph of convex hull

@@ -339,6 +339,10 @@ def make_data(
         'B_rownnz': (m.nbody, jp.int32),
         'B_rowadr': (m.nbody, jp.int32),
         'B_colind': (m.nB, jp.int32),
+        'M_rownnz': (m.nv, jp.int32),
+        'M_rowadr': (m.nv, jp.int32),
+        'M_colind': (m.nM, jp.int32),
+        'mapM2M': (m.nM, jp.int32),
         'C_rownnz': (m.nv, jp.int32),
         'C_rowadr': (m.nv, jp.int32),
         'C_colind': (m.nC, jp.int32),
@@ -368,7 +372,7 @@ def make_data(
         'efc_aref': (nefc, float),
         'efc_force': (nefc, float),
         '_qM_sparse': (m.nM, float),
-        '_qLD_sparse': (m.nC, float),
+        '_qLD_sparse': (m.nM, float),
         '_qLDiagInv_sparse': (m.nv, float),
     }
 
@@ -507,7 +511,7 @@ def get_data_into(
         value = value[dof_i, dof_j]
       elif field.name == 'qLD' and not support.is_sparse(m):
         # TODO(erikfrey): provide correct qLDs
-        value = np.zeros(m.nC)
+        value = np.zeros(m.nM)
       elif field.name == 'qLDiagInv' and not support.is_sparse(m):
         value = np.ones(m.nv)
 
