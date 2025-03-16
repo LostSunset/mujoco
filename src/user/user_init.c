@@ -229,7 +229,7 @@ void mjs_defaultFlex(mjsFlex* flex) {
   // set other defaults
   flex->dim = 2;
   flex->radius = 0.005;
-  flex->internal = 1;
+  flex->internal = 0;
   flex->selfcollide = mjFLEXSELF_AUTO;
   flex->activelayers = 1;
   flex->rgba[0] = flex->rgba[1] = flex->rgba[2] = 0.5f;
@@ -287,7 +287,7 @@ void mjs_defaultMaterial(mjsMaterial* material) {
   material->texrepeat[0] = material->texrepeat[1] = 1;
   material->specular = 0.5;
   material->shininess = 0.5;
-  material->metallic = 1.;
+  material->metallic = 0.0;
   material->roughness = 1.0;
   material->rgba[0] = material->rgba[1] = material->rgba[2] = material->rgba[3] = 1;
 }

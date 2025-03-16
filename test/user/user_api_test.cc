@@ -2342,13 +2342,13 @@ TEST_F(MujocoTest, KeyframeSizeError) {
 
 TEST_F(MujocoTest, DifferentUnitsAllowed) {
   static constexpr char gchild_xml[] = R"(
-  <mujoco model="gchild">
-    <compiler angle="radian"/>
+  <mujoco>
+    <compiler angle="degree"/>
 
     <worldbody>
-      <body name="gchild" euler="-1.5707963 0 0">
+      <body name="gchild" euler="-90 0 0">
         <geom type="box" size="1 1 1"/>
-        <joint name="gchild_joint" range="-3.1415926 3.1415926"/>
+        <joint name="gchild_joint" range="-180 180"/>
       </body>
     </worldbody>
   </mujoco>
@@ -2542,6 +2542,31 @@ TEST_F(MujocoTest, ApplyNameSpaceToDefaults) {
   mj_deleteSpec(parent);
   mj_deleteModel(model);
   mj_deleteVFS(vfs.get());
+}
+
+TEST_F(MujocoTest, ErrorWhenCompilingOrphanedSpec) {
+  static constexpr char xml[] = R"(
+  <mujoco>
+    <worldbody>
+      <body name="a"/>
+    </worldbody>
+  </mujoco>
+  )";
+  std::array<char, 1024> er;
+  mjSpec* child = mj_parseXMLString(xml, 0, er.data(), er.size());
+  EXPECT_THAT(child, NotNull()) << er.data();
+  mjSpec* parent = mj_makeSpec();
+  EXPECT_THAT(parent, NotNull());
+  mjsBody* body = mjs_findBody(child, "a");
+  EXPECT_THAT(body, NotNull());
+  mjsFrame* frame = mjs_addFrame(mjs_findBody(parent, "world"), nullptr);
+  EXPECT_THAT(frame, NotNull());
+  mjs_attachBody(frame, body, "child-", "");
+  mj_deleteSpec(parent);
+  mjModel* model = mj_compile(child, 0);
+  EXPECT_THAT(model, IsNull());
+  EXPECT_THAT(mjs_getError(child), HasSubstr("by reference to a parent"));
+  mj_deleteSpec(child);
 }
 
 }  // namespace

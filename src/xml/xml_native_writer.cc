@@ -220,9 +220,6 @@ void mjXWriter::OneMesh(XMLElement* elem, const mjCMesh* mesh, mjCDef* def) {
     }
     WriteAttrTxt(elem, "content_type", mesh->ContentType());
     WriteAttrTxt(elem, "file", mesh->File());
-    if (mesh->Inertia() != def->Mesh().Inertia()) {
-      WriteAttrTxt(elem, "inertia", FindValue(meshinertia_map, 4, mesh->Inertia()));
-    }
 
     // write vertex data
     if (!mesh->UserVert().empty()) {
@@ -250,6 +247,9 @@ void mjXWriter::OneMesh(XMLElement* elem, const mjCMesh* mesh, mjCDef* def) {
   }
 
   // defaults and regular
+  if (mesh->Inertia() != def->Mesh().Inertia()) {
+    WriteAttrTxt(elem, "inertia", FindValue(meshinertia_map, 4, mesh->Inertia()));
+  }
   WriteAttr(elem, "refpos", 3, mesh->Refpos(), def->Mesh().Refpos());
   WriteAttr(elem, "refquat", 4, mesh->Refquat(), def->Mesh().Refquat());
   WriteAttr(elem, "scale", 3, mesh->Scale(), def->Mesh().Scale());
@@ -323,6 +323,7 @@ void mjXWriter::OneMaterial(XMLElement* elem, const mjCMaterial* material, mjCDe
   }
 
   // defaults and regular
+  // check if we have non-rgb textures
   bool has_non_rgb = false;
   for (int i=1; i<mjNTEXROLE; i++) {
     if (!material->textures_[i].empty()) {
@@ -330,14 +331,23 @@ void mjXWriter::OneMaterial(XMLElement* elem, const mjCMaterial* material, mjCDe
         has_non_rgb = true;
       }
     }
-    if (material->textures_[i] != def->Material().textures_[i]) {
-      WriteAttrTxt(elem, "texture", material->get_texture(i));
+  }
+
+  // if we have non-rgb textures, write them as layers
+  if (has_non_rgb) {
+    for (int i=1; i<mjNTEXROLE; i++) {
+      if (!material->textures_[i].empty()) {
+        XMLElement * child_elem = InsertEnd(elem, "layer");
+        WriteAttrTxt(child_elem, "texture", material->textures_[i]);
+        WriteAttrTxt(child_elem, "role", FindValue(texrole_map, 9, i));
+      }
+    }
+  } else {
+    if (material->textures_[mjTEXROLE_RGB] != def->Material().textures_[mjTEXROLE_RGB]) {
+      WriteAttrTxt(elem, "texture", material->get_texture(mjTEXROLE_RGB));
     }
   }
-  if (has_non_rgb) {
-  //   // TODO elem = InsertEnd(section, "role");
-    throw mjXError(0, "no support for non-RGB textures.");
-  }
+
   WriteAttrKey(elem, "texuniform", bool_map, 2, material->texuniform, def->Material().texuniform);
   WriteAttr(elem, "texrepeat", 2, material->texrepeat, def->Material().texrepeat);
   WriteAttr(elem, "emission", 1, &material->emission, &def->Material().emission);
