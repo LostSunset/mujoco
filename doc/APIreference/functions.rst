@@ -99,7 +99,7 @@ Free last XML model if loaded. Called internally at each load.
 .. mujoco-include:: mj_saveXMLString
 
 Save spec to XML string, return 0 on success, -1 on failure. If the length of the output buffer is too small, returns
-the required size. XML saving requires that the spec first be compiled.
+the required size. XML saving automatically compiles the spec before saving.
 
 .. _mj_saveXML:
 
@@ -3851,7 +3851,16 @@ Attach child frame to a parent site, return the attached frame if success or NUL
 
 .. mujoco-include:: mjs_detachBody
 
-Detach body from mjSpec, remove all references and delete the body, return 0 on success.
+Delete body and descendants from mjSpec, remove all references, return 0 on success.
+
+.. _mjs_detachDefault:
+
+`mjs_detachDefault <#mjs_detachDefault>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_detachDefault
+
+Delete default class and descendants from mjSpec, remove all references, return 0 on success.
 
 .. _AddTreeElements:
 
@@ -3936,7 +3945,8 @@ Add frame to body.
 
 .. mujoco-include:: mjs_delete
 
-Delete object corresponding to the given element, return 0 on success.
+Delete object corresponding to the given element, return 0 on success. This function should only be used for element
+types that cannot have children, i.e. excluding bodies and default classes.
 
 .. _AddNonTreeElements:
 
@@ -4202,6 +4212,15 @@ Find child body by name.
 
 Get parent body.
 
+.. _mjs_getFrame:
+
+`mjs_getFrame <#mjs_getFrame>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_getFrame
+
+Get parent frame.
+
 .. _mjs_findFrame:
 
 `mjs_findFrame <#mjs_findFrame>`__
@@ -4448,6 +4467,33 @@ Resolve alternative orientations to quat, return error if any.
 .. mujoco-include:: mjs_bodyToFrame
 
 Transform body into a frame.
+
+.. _mjs_setUserValue:
+
+`mjs_setUserValue <#mjs_setUserValue>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_setUserValue
+
+Set user payload, overriding the existing value for the specified key if present.
+
+.. _mjs_getUserValue:
+
+`mjs_getUserValue <#mjs_getUserValue>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_getUserValue
+
+Return user payload or NULL if none found.
+
+.. _mjs_deleteUserValue:
+
+`mjs_deleteUserValue <#mjs_deleteUserValue>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_deleteUserValue
+
+Delete user payload.
 
 .. _ElementInitialization:
 

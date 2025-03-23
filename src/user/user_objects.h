@@ -23,11 +23,14 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include <mujoco/mjmodel.h>
+#include <mujoco/mjplugin.h>
 #include <mujoco/mjspec.h>
-#include <mujoco/mujoco.h>
+#include <mujoco/mjtnum.h>
 #include "user/user_cache.h"
 #include "user/user_util.h"
 #include <tiny_obj_loader.h>
@@ -190,6 +193,11 @@ class mjCBoundingVolumeHierarchy : public mjCBoundingVolumeHierarchy_ {
   int Nodeid(int id) const { return nodeid_[id]; }
   const int* Nodeidptr(int id) const { return nodeidptr_[id]; }
   const std::vector<int>& Level() const { return level_; }
+  int Size() const {
+    return sizeof(mjCBoundingVolume) * bvleaf_.size()
+        + sizeof(mjtNum) * bvh_.size() + sizeof(int) * child_.size()
+        + sizeof(int) * nodeid_.size() + sizeof(int) * level_.size();
+  }
 
  private:
   // internal class used during BVH construction, for partial sorting of bounding volumes
@@ -269,12 +277,20 @@ class mjCBase : public mjCBase_ {
     }
   }
 
+  // Set and get user payload
+  void SetUserValue(std::string_view key, const void* data);
+  const void* GetUserValue(std::string_view key);
+  void DeleteUserValue(std::string_view key);
+
  protected:
   mjCBase();                                 // constructor
   mjCBase(const mjCBase& other);             // copy constructor
 
   // reference count for allowing deleting an attached object
   int refcount = 1;
+
+  // user payload
+  std::unordered_map<std::string, const void*> user_payload_;
 };
 
 
@@ -776,7 +792,7 @@ class mjCLight : public mjCLight_, private mjsLight {
 
 class mjCFlex_ : public mjCBase {
  protected:
-  int nvert;                              // number of verices
+  int nvert;                              // number of vertices
   int nnode;                              // number of nodes
   int nedge;                              // number of edges
   int nelem;                              // number of elements
@@ -1077,12 +1093,6 @@ class mjCMesh: public mjCMesh_, private mjsMesh {
   std::vector<std::vector<int>> polygons_;      // polygons of the mesh
   std::vector<double> polygon_normals_;         // normals of the polygons
   std::vector<std::vector<int>> polygon_map_;   // map from vertex to polygon
-
-  // for caching purposes
-  std::vector<int> vertex_index_;
-  std::vector<int> normal_index_;
-  std::vector<int> texcoord_index_;
-  std::vector<face_vertices_type> num_face_vertices_;
 
   // compute the volume and center-of-mass of the mesh given the face centroid
   double ComputeVolume(double CoM[3], const double facecen[3]) const;
@@ -1856,6 +1866,7 @@ class mjCDef : public mjsElement {
 
  public:
   mjCDef();
+  mjCDef(mjCModel*);
   mjCDef(const mjCDef& other);
   mjCDef& operator=(const mjCDef& other);
   mjCDef& operator+=(const mjCDef& other);
@@ -1888,6 +1899,7 @@ class mjCDef : public mjsElement {
   std::vector<mjCDef*> child;     // child classes
 
   mjsDefault spec;
+  mjCModel* model;                // pointer to model that owns object
 
  private:
   mjCJoint joint_;

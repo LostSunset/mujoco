@@ -108,7 +108,7 @@ mjModel* mj_compile(mjSpec* s, const mjVFS* vfs) {
     if (d) {
       modelC->MakeData(m, &d);
       modelC->RestoreState(state_name, m->qpos0, m->body_pos, m->body_quat, d->qpos, d->qvel,
-                          d->act, d->ctrl, d->mocap_pos, d->mocap_quat);
+                           d->act, d->ctrl, d->mocap_pos, d->mocap_quat);
       d->time = time;
     }
   } catch (mjCError& e) {
@@ -166,7 +166,7 @@ mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
 
 // attach child body to a parent site
 mjsBody* mjs_attachToSite(mjsSite* parent, const mjsBody* child,
-                           const char* prefix, const char* suffix) {
+                          const char* prefix, const char* suffix) {
   if (!parent) {
     mju_error("parent site is null");
     return nullptr;
@@ -227,7 +227,7 @@ const char* mjs_getError(mjSpec* s) {
 
 
 
-// Detach body from mjSpec, return 0 if success.
+// detach body from mjSpec, return 0 on success
 int mjs_detachBody(mjSpec* s, mjsBody* b) {
   mjCModel* model = static_cast<mjCModel*>(s->element);
   mjCBody* body = static_cast<mjCBody*>(b->element);
@@ -241,7 +241,22 @@ int mjs_detachBody(mjSpec* s, mjsBody* b) {
   return 0;
 }
 
-
+// detach default from mjSpec, return 0 on success
+int mjs_detachDefault(mjSpec* s, mjsDefault* def) {
+  mjCModel* modelC = static_cast<mjCModel*>(s->element);
+  if (!def) {
+    modelC->SetError(mjCError(0, "Cannot detach, default is null"));
+    return -1;
+  }
+  mjCDef* defC = static_cast<mjCDef*>(def->element);
+  try {
+    *modelC -= *defC;
+  } catch (mjCError& e) {
+    modelC->SetError(e);
+    return -1;
+  }
+  return 0;
+}
 
 // check if model has warnings
 int mjs_isWarning(mjSpec* s) {
@@ -292,15 +307,19 @@ int mjs_setDeepCopy(mjSpec* s, int deepcopy) {
 
 
 
-// delete object, return 0 if success
+// delete object, return 0 on success
 int mjs_delete(mjsElement* element) {
-  mjCBase* object = static_cast<mjCBase*>(element);
+  mjCModel* model;
+  if (element->elemtype == mjOBJ_DEFAULT)
+    model = static_cast<mjCDef*>(element)->model;
+  else
+    model = static_cast<mjCBase*>(element)->model;
   try {
     // it will call the appropriate destructor since ~mjCBase is virtual
-    object->model->DeleteElement(element);
+    model->DeleteElement(element);
     return 0;
   } catch (mjCError& e) {
-    object->model->SetError(e);
+    model->SetError(e);
     return -1;
   }
 }
@@ -625,7 +644,7 @@ mjsDefault* mjs_getDefault(mjsElement* element) {
 
 
 // Find default with given name in model.
-const mjsDefault* mjs_findDefault(mjSpec* s, const char* classname) {
+mjsDefault* mjs_findDefault(mjSpec* s, const char* classname) {
   mjCModel* modelC = static_cast<mjCModel*>(s->element);
   mjCDef* cdef = modelC->FindDefault(classname);
   if (!cdef) {
@@ -711,6 +730,25 @@ mjsBody* mjs_getParent(mjsElement* element) {
 
 
 
+// get parent frame
+mjsFrame* mjs_getFrame(mjsElement* element) {
+  mjCBase* base = static_cast<mjCBase*>(element);
+  switch (element->elemtype) {
+    case mjOBJ_BODY:
+    case mjOBJ_FRAME:
+    case mjOBJ_JOINT:
+    case mjOBJ_GEOM:
+    case mjOBJ_SITE:
+    case mjOBJ_CAMERA:
+    case mjOBJ_LIGHT:
+      return base->frame ? &(base->frame->spec) : nullptr;
+    default:
+      return nullptr;
+  }
+}
+
+
+
 // find frame by name
 mjsFrame* mjs_findFrame(mjSpec* s, const char* name) {
   mjsElement* frame = mjs_findElement(s, mjOBJ_FRAME, name);
@@ -746,6 +784,30 @@ mjsFrame* mjs_bodyToFrame(mjsBody** body) {
   bodyC->model->Detach(bodyC);
   *body = nullptr;
   return &frameC->spec;
+}
+
+
+
+// set user payload
+void mjs_setUserValue(mjsElement* element, const char* key, const void* data) {
+  mjCBase* baseC = static_cast<mjCBase*>(element);
+  baseC->SetUserValue(key, data);
+}
+
+
+
+// return user payload or NULL if none found
+const void* mjs_getUserValue(mjsElement* element, const char* key) {
+  mjCBase* baseC = static_cast<mjCBase*>(element);
+  return baseC->GetUserValue(key);
+}
+
+
+
+// delete user payload
+void mjs_deleteUserValue(mjsElement* element, const char* key) {
+  mjCBase* baseC = static_cast<mjCBase*>(element);
+  baseC->DeleteUserValue(key);
 }
 
 
@@ -1159,8 +1221,8 @@ const double* mjs_getDouble(const mjDoubleVec* source, int* size) {
 // set plugin attributes
 void mjs_setPluginAttributes(mjsPlugin* plugin, void* attributes) {
   mjCPlugin* pluginC = static_cast<mjCPlugin*>(plugin->element);
-  std::map<std::string, std::string, std::less<>>* config_attribs =
-      reinterpret_cast<std::map<std::string, std::string, std::less<>>*>(attributes);
+  std::map<std::string, std::string, std::less<> >* config_attribs =
+    reinterpret_cast<std::map<std::string, std::string, std::less<> >*>(attributes);
   pluginC->config_attribs = std::move(*config_attribs);
 }
 

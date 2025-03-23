@@ -183,10 +183,11 @@ class mjCModel : public mjCModel_, private mjSpec {
   void CopyFromSpec();  // copy spec to private attributes
   void PointToLocal();
 
-  mjCModel& operator=(const mjCModel& other);  // copy other into this, if they are not the same
-  mjCModel& operator+=(const mjCModel& other);  // add other into this, even if they are the same
-  mjCModel& operator-=(const mjCBody& subtree);  // remove subtree and all references from model
-  mjCModel_& operator+=(mjCDef& subtree);  // add default tree to this model
+  mjCModel& operator=(const mjCModel& other);     // copy other into this, if they are not the same
+  mjCModel& operator+=(const mjCModel& other);    // add other into this, even if they are the same
+  mjCModel& operator-=(const mjCBody& subtree);   // remove subtree and all references from model
+  mjCModel_& operator+=(mjCDef& subtree);         // add default tree to this model
+  mjCModel& operator-=(const mjCDef& subtree);    // remove default tree from this model
 
   mjSpec spec;
 
@@ -224,6 +225,9 @@ class mjCModel : public mjCModel_, private mjSpec {
 
   // delete object from the corresponding list
   void DeleteElement(mjsElement* el);
+
+  // delete default and all descendants
+  void RemoveDefault(mjCDef* def);
 
   // detach subtree from model
   void Detach(mjCBody* subtree);
@@ -346,6 +350,9 @@ class mjCModel : public mjCModel_, private mjSpec {
   void CopyPlugins(mjModel*);           // copy plugin data
   int CountNJmom(const mjModel* m);     // compute number of non-zeros in actuator_moment matrix
 
+  // remove plugins that are not referenced by any object
+  void RemovePlugins();
+
   // objects created here
   std::vector<mjCFlex*>     flexes_;      // list of flexes
   std::vector<mjCMesh*>     meshes_;      // list of meshes
@@ -425,6 +432,11 @@ class mjCModel : public mjCModel_, private mjSpec {
 
   // return true if body has valid mass and inertia
   bool CheckBodyMassInertia(mjCBody* body);
+
+  // Mark plugin instances mentioned in the list
+  template <class T>
+  void MarkPluginInstance(std::unordered_map<std::string, bool>& instances,
+                          const std::vector<T*>& list);
 
 
   mjListKeyMap ids;   // map from object names to ids

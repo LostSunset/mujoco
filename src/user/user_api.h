@@ -88,6 +88,8 @@ MJAPI mjsFrame* mjs_attachFrameToSite(mjsSite* parent, const mjsFrame* child,
 // Detach body from mjSpec, remove all references and delete the body, return 0 on success.
 MJAPI int mjs_detachBody(mjSpec* s, mjsBody* b);
 
+// Detach default from mjSpec, remove all references and delete the default, return 0 on success.
+MJAPI int mjs_detachDefault(mjSpec* s, mjsDefault* d);
 
 //---------------------------------- Add tree elements ---------------------------------------------
 
@@ -211,6 +213,9 @@ MJAPI mjsBody* mjs_findChild(mjsBody* body, const char* name);
 // Get parent body.
 MJAPI mjsBody* mjs_getParent(mjsElement* element);
 
+// Get parent frame.
+MJAPI mjsFrame* mjs_getFrame(mjsElement* element);
+
 // Find frame by name.
 MJAPI mjsFrame* mjs_findFrame(mjSpec* s, const char* name);
 
@@ -218,7 +223,7 @@ MJAPI mjsFrame* mjs_findFrame(mjSpec* s, const char* name);
 MJAPI mjsDefault* mjs_getDefault(mjsElement* element);
 
 // Find default in model by class name.
-MJAPI const mjsDefault* mjs_findDefault(mjSpec* s, const char* classname);
+MJAPI mjsDefault* mjs_findDefault(mjSpec* s, const char* classname);
 
 // Get global default from model.
 MJAPI mjsDefault* mjs_getSpecDefault(mjSpec* s);
@@ -374,6 +379,15 @@ MJAPI const char* mjs_resolveOrientation(double quat[4], mjtByte degree, const c
 
 // Transform body into a frame.
 MJAPI mjsFrame* mjs_bodyToFrame(mjsBody** body);
+
+// Set user payload.
+MJAPI void mjs_setUserValue(mjsElement* element, const char* key, const void* data);
+
+// Return user payload or NULL if none found.
+MJAPI const void* mjs_getUserValue(mjsElement* element, const char* key);
+
+// Delete user payload.
+MJAPI void mjs_deleteUserValue(mjsElement* element, const char* key);
 
 
 //---------------------------------- Initialization  -----------------------------------------------
