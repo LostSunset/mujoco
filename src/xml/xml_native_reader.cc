@@ -287,8 +287,8 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"<"},
           {"config", "*", "2", "key", "value"},
         {">"},
-        {"composite", "*", "8", "prefix", "type", "count", "offset",
-            "vertex", "initial", "curve", "size"},
+        {"composite", "*", "9", "prefix", "type", "count", "offset",
+            "vertex", "initial", "curve", "size", "quat"},
         {"<"},
             {"joint", "*", "17", "kind", "group", "stiffness", "damping", "armature",
                 "solreffix", "solimpfix", "type", "axis",
@@ -2388,7 +2388,7 @@ void mjXReader::OneActuator(XMLElement* elem, mjsActuator* actuator) {
 
 
 // make composite
-void mjXReader::OneComposite(XMLElement* elem, mjsBody* body, const mjsDefault* def) {
+void mjXReader::OneComposite(XMLElement* elem, mjsBody* body, mjsFrame* frame, const mjsDefault* def) {
   string text;
   int n;
 
@@ -2402,6 +2402,8 @@ void mjXReader::OneComposite(XMLElement* elem, mjsBody* body, const mjsDefault* 
   }
   ReadAttr(elem, "count", 3, comp.count, text, false, false);
   ReadAttr(elem, "offset", 3, comp.offset, text);
+  ReadAttr(elem, "quat", 4, comp.quat, text);
+  comp.frame = frame;
 
   // plugin
   XMLElement* eplugin = FirstChildElement(elem, "plugin");
@@ -3467,7 +3469,7 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
     // composite sub-element
     else if (name == "composite") {
       // parse composite
-      OneComposite(elem, body, def);
+      OneComposite(elem, body, frame, def);
     }
 
     // flexcomp sub-element

@@ -414,6 +414,9 @@ struct mjData_ {
 
   // thread pool pointer
   uintptr_t threadpool;
+
+  // compilation signature
+  uint64_t  signature;       // also held by the mjSpec that compiled the model
 };
 typedef struct mjData_ mjData;
 typedef enum mjtDisableBit_ {     // disable default feature bitflags
@@ -907,7 +910,7 @@ struct mjModel_ {
   int ncam;                       // number of cameras
   int nlight;                     // number of lights
   int nflex;                      // number of flexes
-  int nflexnode;                   // number of dofs in all flexes
+  int nflexnode;                  // number of dofs in all flexes
   int nflexvert;                  // number of vertices in all flexes
   int nflexedge;                  // number of edges in all flexes
   int nflexelem;                  // number of elements in all flexes
@@ -1451,6 +1454,9 @@ struct mjModel_ {
 
   // paths
   char*     paths;                // paths to assets, 0-terminated            (npaths x 1)
+
+  // compilation signature
+  uint64_t  signature;            // also held by the mjSpec that compiled this model
 };
 typedef struct mjModel_ mjModel;
 struct mjResource_ {
@@ -1713,6 +1719,7 @@ typedef enum mjtOrientation_ {     // type of orientation specifier
 } mjtOrientation;
 typedef struct mjsElement_ {       // element type, do not modify
   mjtObj elemtype;                 // element type
+  uint64_t signature;              // compilation signature
 } mjsElement;
 typedef struct mjsCompiler_ {      // compiler options
   mjtByte autolimits;              // infer "limited" attribute based on range
