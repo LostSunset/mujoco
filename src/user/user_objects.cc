@@ -773,6 +773,9 @@ void mjCBase::SetFrame(mjCFrame* _frame) {
   if (!_frame) {
     return;
   }
+  if (_frame->body && GetParent() != _frame->body) {
+    throw mjCError(this, "Frame and body '%s' have mismatched parents", name.c_str());
+  }
   frame = _frame;
 }
 
@@ -837,7 +840,7 @@ mjCBody::mjCBody(mjCModel* _model) {
 
 mjCBody::mjCBody(const mjCBody& other, mjCModel* _model) {
   model = _model;
-  uid = model->GetUid();
+  uid = other.uid;
   mjSpec* origin = model->FindSpec(other.compiler);
   compiler = origin ? &origin->compiler : &model->spec.compiler;
   *this = other;
@@ -891,8 +894,18 @@ mjCBody& mjCBody::operator+=(const mjCBody& other) {
   for (int i=0; i < other.bodies.size(); i++) {
     bodies.push_back(new mjCBody(*other.bodies[i], model));  // triggers recursive call
     bodies.back()->parent = this;
-    bodies.back()->frame =
-      other.bodies[i]->frame ? frames[fmap[other.bodies[i]->frame]] : nullptr;
+    bodies.back()->frame = nullptr;
+    if (other.bodies[i]->frame) {
+      if (fmap.find(other.bodies[i]->frame) != fmap.end()) {
+        bodies.back()->frame = frames[fmap[other.bodies[i]->frame]];
+      } else {
+        throw mjCError(this, "Frame '%s' not found in other body",
+                       other.bodies[i]->frame->name.c_str());
+      }
+      if (bodies.back()->frame && bodies.back()->frame->body != this) {
+        throw mjCError(this, "Frame and body '%s' have mismatched parents", name.c_str());
+      }
+    }
   }
 
   return *this;
@@ -931,7 +944,7 @@ mjCBody& mjCBody::operator+=(const mjCFrame& other) {
   frames.back()->frame = other.frame;
   if (model->deepcopy_) {
     frames.back()->NameSpace(other_model);
-    frames.back()->uid = model->GetUid();
+    frames.back()->uid = other.uid;
   } else {
     frames.back()->AddRef();
   }
@@ -1025,7 +1038,7 @@ void mjCBody::CopyList(std::vector<T*>& dst, const std::vector<T*>& src,
     if (!model->deepcopy_) {
       dst.back()->AddRef();
     } else {
-      dst.back()->uid = model->GetUid();
+      dst.back()->uid = src[i]->uid;
     }
 
     // set namespace
@@ -1960,16 +1973,6 @@ void mjCBody::Compile(void) {
     const mjpPlugin* pplugin = mjp_getPluginAtSlot(plugin_instance->plugin_slot);
     if (!(pplugin->capabilityflags & mjPLUGIN_PASSIVE)) {
       throw mjCError(this, "plugin '%s' does not support passive forces", pplugin->name);
-    }
-  }
-
-  // if discarding visual geoms, use explicit inertias
-  if (compiler->discardvisual) {
-    for (int j=0; j < geoms.size(); j++) {
-      if (geoms[j]->IsVisual()) {
-        explicitinertial = true;
-        break;
-      }
     }
   }
 
@@ -5613,6 +5616,12 @@ void mjCTendon::Compile(void) {
 
     // spatial path
     else {
+      if (armature < 0) {
+        throw mjCError(this,
+                       "tendon '%s' (id = %d): tendon armature cannot be negative",
+                        name.c_str(), id);
+      }
+
       switch (path[i]->type) {
         case mjWRAP_PULLEY:
           // pulley should not follow other pulley
@@ -5652,6 +5661,12 @@ void mjCTendon::Compile(void) {
             throw mjCError(this,
                            "tendon '%s' (id = %d): geom at pos %d not bracketed by sites",
                            name.c_str(), id, i);
+          }
+
+          if (armature > 0) {
+            throw mjCError(this,
+                           "tendon '%s' (id = %d): geom wrapping not supported by tendon armature",
+                           name.c_str(), id);
           }
 
           // mark geoms as non visual

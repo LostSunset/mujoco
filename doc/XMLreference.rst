@@ -175,11 +175,10 @@ replicating 200 times, suffixes will be ``000, 001, ...`` etc). All referencing 
 and namespaced appropriately. Detailed examples of models using replicate can be found in the
 `model/replicate/ <https://github.com/google-deepmind/mujoco/tree/main/model/replicate>`__ directory.
 
-There is a caveat concerning :ref:`keyframes<keyframe>` when using replicate. Since :ref:`mjs_attachFrame` is used to
+There is a caveat concerning :ref:`keyframes<keyframe>` when using replicate. Since :ref:`mjs_attach` is used to
 self-attach multiple times the enclosed kinematic tree, if this tree contains further :ref:`attach<body-attach>`
 elements, keyframes will not be replicated nor namespaced by :ref:`replicate<replicate>`, but they will be attached and
-namespaced once by the innermost call of :ref:`mjs_attachFrame` or :ref:`mjs_attachBody`. See the limitations discussed
-in :ref:`attach<body-attach>`.
+namespaced once by the innermost call of :ref:`mjs_attach`. See the limitations discussed in :ref:`attach<body-attach>`.
 
 .. _replicate-count:
 
@@ -833,6 +832,10 @@ has any effect. The settings here are global and apply to the entire model.
    necessary to adjust this attribute and the geom-specific groups so as to exclude world geoms from the inertial
    computation.
 
+.. _compiler-saveinertial:
+
+:at:`saveinertial`: :at-val:`[false, true], "false"`
+   If set to "true", the compiler will save explicit :ref:`inertial <body-inertial>` clauses for all bodies.
 
 .. _compiler-lengthrange:
 
@@ -2151,14 +2154,28 @@ rotations as unit quaternions.
    corresponding to mjModel.qpos_spring is also used to compute the spring reference lengths of all tendons, stored in
    mjModel.tendon_lengthspring. This is because :ref:`tendons <tendon>` can also have springs.
 
+.. image:: images/XMLreference/armature.gif
+   :width: 40%
+   :align: right
+   :class: only-light
+   :target: https://github.com/google-deepmind/mujoco/blob/main/test/engine/testdata/armature_equivalence.xml
+.. image:: images/XMLreference/armature_dark.gif
+   :width: 40%
+   :align: right
+   :class: only-dark
+   :target: https://github.com/google-deepmind/mujoco/blob/main/test/engine/testdata/armature_equivalence.xml
+
 .. _body-joint-armature:
 
 :at:`armature`: :at-val:`real, "0"`
    Additional inertia associated with movement of the joint that is not due to body mass. This added inertia is usually
    due to a rotor (a.k.a `armature <https://en.wikipedia.org/wiki/Armature_(electrical)>`__) spinning faster than the
-   joint itself due to a geared transmission; in this case the added inertia is known as "reflected inertia" and its
-   value is the rotational inertia of the spinning element multiplied by the square of the gear ratio. The value applies
-   to all degrees of freedom created by this joint.
+   joint itself due to a geared transmission. In the illustration, we compare (*left*) a 2-dof system with an armature
+   body (purple box), coupled with a gear ratio of :math:`3` to the pendulum using a :ref:`joint
+   equality<equality-joint>` constraint, and (*right*) a simple 1-dof pendulum with an equivalent :at:`armature`.
+   Because the gear ratio appears twice, multiplying both forces and lengths, the effect is known as "reflected
+   inertia" and the equivalent value is the inertia of the spinning body multiplied by the *square of the gear ratio*,
+   in this case :math:`9=3^2`. The value applies to all degrees of freedom created by this joint.
 
    Besides increasing the realism of joints with geared transmission, positive :at:`armature` significantly improves
    simulation stability, even for small values, and is a recommended possible fix when encountering stability issues.
@@ -3703,8 +3720,9 @@ all attachments will appear in the saved XML file.
 
 .. _body-attach-body:
 
-:at:`body`: :at-val:`string, required`
-   Name of the body in the sub-model to attach here. The body and its subtree will be attached.
+:at:`body`: :at-val:`string, optional`
+   Name of the body in the sub-model to attach here. The body and its subtree will be attached. If this attribute is not
+   specified, the contents of the world body will be attached in a new :ref:`frame<body-frame>`.
 
 .. _body-attach-prefix:
 
@@ -4688,6 +4706,31 @@ length X, as in the clip on the right of `this example model
    joint damping which is integrated implicitly by the Euler method, tendon damping is not integrated implicitly, thus
    joint damping should be used if possible.
 
+.. image:: images/XMLreference/tendon_armature.gif
+   :width: 30%
+   :align: right
+   :class: only-light
+   :target: https://github.com/google-deepmind/mujoco/blob/main/test/engine/testdata/core_smooth/ten_armature_1_compare.xml
+.. image:: images/XMLreference/tendon_armature_dark.gif
+   :width: 30%
+   :align: right
+   :class: only-dark
+   :target: https://github.com/google-deepmind/mujoco/blob/main/test/engine/testdata/core_smooth/ten_armature_1_compare.xml
+
+.. _tendon-spatial-armature:
+
+:at:`armature`: :at-val:`real, "0"`
+   Inertia associated with changes in tendon length. Setting this attribute to a positive value :math:`m` adds a kinetic
+   energy term :math:`\frac{1}{2}mv^2`, where :math:`v` is the tendon velocity. Tendon inertia is most valuable
+   when modeling the :ref:`armature<body-joint-armature>` inertia in a linear actuator which contains a spinning element
+   or the inertial motion of a fluid in a linear hydraulic actuator. In the illustration, we compare (*left*) a 3-dof
+   system with a "tendon" implemented with a rotational joint and a slider joint with
+   :ref:`armature<body-joint-armature>`, attached to the world with a :ref:`connect<equality-connect>` constraint and
+   (*right*) an equivalent 1-dof model with an armature-bearing tendon. Like joint :ref:`armature<body-joint-armature>`,
+   this added inertia is only associated with changes in tendon length, and would not affect the dynamics of a moving
+   fixed-length tendon. Because the tendon Jacobian :math:`J` is position-dependent, tendon armature leads to an
+   additional bias-force term :math:`c = m J \dot{J}^T \dot{q}`.
+
 .. _tendon-spatial-user:
 
 :at:`user`: :at-val:`real(nuser_tendon), "0 0 ..."`
@@ -4796,6 +4839,8 @@ as above.
 .. _tendon-fixed-stiffness:
 
 .. _tendon-fixed-damping:
+
+.. _tendon-fixed-armature:
 
 .. _tendon-fixed-user:
 

@@ -607,7 +607,8 @@ typedef enum mjtObj_ {            // type of MujoCo object
 
   // meta elements, do not appear in mjModel
   mjOBJ_FRAME         = 100,      // frame
-  mjOBJ_DEFAULT                   // default
+  mjOBJ_DEFAULT,                  // default
+  mjOBJ_MODEL                     // entire model
 
 } mjtObj;
 typedef enum mjtConstraint_ {     // type of constraint
@@ -1338,6 +1339,7 @@ struct mjModel_ {
   mjtNum*   tendon_margin;        // min distance for limit detection         (ntendon x 1)
   mjtNum*   tendon_stiffness;     // stiffness coefficient                    (ntendon x 1)
   mjtNum*   tendon_damping;       // damping coefficient                      (ntendon x 1)
+  mjtNum*   tendon_armature;      // inertia associated with tendon velocity  (ntendon x 1)
   mjtNum*   tendon_frictionloss;  // loss due to friction                     (ntendon x 1)
   mjtNum*   tendon_lengthspring;  // spring resting length range              (ntendon x 2)
   mjtNum*   tendon_length0;       // tendon length in qpos0                   (ntendon x 1)
@@ -1735,6 +1737,7 @@ typedef struct mjsCompiler_ {      // compiler options
   mjtByte fusestatic;              // fuse static bodies with parent
   int inertiafromgeom;             // use geom inertias (mjtInertiaFromGeom)
   int inertiagrouprange[2];        // range of geom groups used to compute inertia
+  mjtByte saveinertial;            // save explicit inertial clause for all bodies to XML
   int alignfree;                   // align free joints with inertial frame
   mjLROpt LRopt;                   // options for lengthrange computation
 } mjsCompiler;
@@ -2172,13 +2175,14 @@ typedef struct mjsTendon_ {        // tendon specification
   mjsElement* element;             // element type
   mjString* name;                  // name
 
-  // stiffness, damping, friction
+  // stiffness, damping, friction, armature
   double stiffness;                // stiffness coefficient
   double springlength[2];          // spring resting length; {-1, -1}: use qpos_spring
   double damping;                  // damping coefficient
   double frictionloss;             // friction loss
   mjtNum solref_friction[mjNREF];  // solver reference: tendon friction
   mjtNum solimp_friction[mjNIMP];  // solver impedance: tendon friction
+  double armature;                 // inertia associated with tendon velocity
 
   // length range
   int limited;                     // does tendon have limits (mjtLimited)
@@ -3612,14 +3616,8 @@ void mju_threadPoolEnqueue(mjThreadPool* thread_pool, mjTask* task);
 void mju_threadPoolDestroy(mjThreadPool* thread_pool);
 void mju_defaultTask(mjTask* task);
 void mju_taskJoin(mjTask* task);
-mjsBody* mjs_attachBody(mjsFrame* parent, const mjsBody* child,
-                        const char* prefix, const char* suffix);
-mjsFrame* mjs_attachFrame(mjsBody* parent, const mjsFrame* child,
-                          const char* prefix, const char* suffix);
-mjsBody* mjs_attachToSite(mjsSite* parent, const mjsBody* child,
-                          const char* prefix, const char* suffix);
-mjsFrame* mjs_attachFrameToSite(mjsSite* parent, const mjsFrame* child,
-                                const char* prefix, const char* suffix);
+mjsElement* mjs_attach(mjsElement* parent, const mjsElement* child,
+                       const char* prefix, const char* suffix);
 int mjs_detachBody(mjSpec* s, mjsBody* b);
 int mjs_detachDefault(mjSpec* s, mjsDefault* d);
 mjsBody* mjs_addBody(mjsBody* body, const mjsDefault* def);
@@ -3683,7 +3681,7 @@ void mjs_setPluginAttributes(mjsPlugin* plugin, void* attributes);
 const char* mjs_getString(const mjString* source);
 const double* mjs_getDouble(const mjDoubleVec* source, int* size);
 void mjs_setDefault(mjsElement* element, const mjsDefault* def);
-void mjs_setFrame(mjsElement* dest, mjsFrame* frame);
+int mjs_setFrame(mjsElement* dest, mjsFrame* frame);
 const char* mjs_resolveOrientation(double quat[4], mjtByte degree, const char* sequence,
                                    const mjsOrientation* orientation);
 mjsFrame* mjs_bodyToFrame(mjsBody** body);

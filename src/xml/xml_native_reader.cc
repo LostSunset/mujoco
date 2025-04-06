@@ -97,10 +97,10 @@ static void UpdateString(string& psuffix, int count, int i) {
 const char* MJCF[nMJCF][mjXATTRNUM] = {
 {"mujoco", "!", "1", "model"},
 {"<"},
-    {"compiler", "*", "19", "autolimits", "boundmass", "boundinertia", "settotalmass",
+    {"compiler", "*", "20", "autolimits", "boundmass", "boundinertia", "settotalmass",
         "balanceinertia", "strippath", "coordinate", "angle", "fitaabb", "eulerseq",
-        "meshdir", "texturedir", "discardvisual", "usethread",
-        "fusestatic", "inertiafromgeom", "inertiagrouprange", "assetdir", "alignfree"},
+        "meshdir", "texturedir", "discardvisual", "usethread", "fusestatic", "inertiafromgeom",
+        "inertiagrouprange", "saveinertial", "assetdir", "alignfree"},
     {"<"},
         {"lengthrange", "?", "10", "mode", "useexisting", "uselimit",
             "accel", "maxforce", "timeconst", "timestep",
@@ -363,18 +363,18 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
 
     {"tendon", "*", "0"},
     {"<"},
-        {"spatial", "*", "18", "name", "class", "group", "limited", "range",
+        {"spatial", "*", "19", "name", "class", "group", "limited", "range",
             "solreflimit", "solimplimit", "solreffriction", "solimpfriction",
             "frictionloss", "springlength", "width", "material",
-            "margin", "stiffness", "damping", "rgba", "user"},
+            "margin", "stiffness", "damping", "armature", "rgba", "user"},
         {"<"},
             {"site", "*", "1", "site"},
             {"geom", "*", "2", "geom", "sidesite"},
             {"pulley", "*", "1", "divisor"},
         {">"},
-        {"fixed", "*", "15", "name", "class", "group", "limited", "range",
+        {"fixed", "*", "16", "name", "class", "group", "limited", "range",
             "solreflimit", "solimplimit", "solreffriction", "solimpfriction",
-            "frictionloss", "springlength", "margin", "stiffness", "damping", "user"},
+            "frictionloss", "springlength", "margin", "stiffness", "damping", "armature", "user"},
         {"<"},
             {"joint", "*", "2", "joint", "coef"},
         {">"},
@@ -1014,6 +1014,9 @@ void mjXReader::Compiler(XMLElement* section, mjSpec* spec) {
   ReadAttr(section, "inertiagrouprange", 2, spec->compiler.inertiagrouprange, text);
   if (MapValue(section, "alignfree", &n, bool_map, 2)) {
     spec->compiler.alignfree = (n == 1);
+  }
+  if (MapValue(section, "saveinertial", &n, bool_map, 2)) {
+    spec->compiler.saveinertial = (n == 1);
   }
 
   // lengthrange subelement
@@ -2058,6 +2061,7 @@ void mjXReader::OneTendon(XMLElement* elem, mjsTendon* tendon) {
   ReadAttr(elem, "margin", 1, &tendon->margin, text);
   ReadAttr(elem, "stiffness", 1, &tendon->stiffness, text);
   ReadAttr(elem, "damping", 1, &tendon->damping, text);
+  ReadAttr(elem, "armature", 1, &tendon->armature, text);
   ReadAttr(elem, "frictionloss", 1, &tendon->frictionloss, text);
   // read springlength, either one or two values; if one, copy to second value
   if (ReadAttr(elem, "springlength", 2, tendon->springlength, text, false, false) == 1) {
@@ -3566,7 +3570,7 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
         UpdateString(suffix, count, i);
 
         // attach to parent
-        if (!mjs_attachFrame(body, pframe, /*prefix=*/"", suffix.c_str())) {
+        if (!mjs_attach(body->element, pframe->element, /*prefix=*/"", suffix.c_str())) {
           throw mjXError(elem, mjs_getError(spec));
         }
       }
@@ -3627,27 +3631,35 @@ void mjXReader::Body(XMLElement* section, mjsBody* body, mjsFrame* frame,
     else if (name == "attach") {
       string model_name, body_name, prefix;
       ReadAttrTxt(elem, "model", model_name, /*required=*/true);
-      ReadAttrTxt(elem, "body", body_name, /*required=*/true);
+      ReadAttrTxt(elem, "body", body_name, /*required=*/false);
       ReadAttrTxt(elem, "prefix", prefix, /*required=*/true);
 
-      mjsBody* child = mjs_findBody(spec, (prefix+body_name).c_str());
+      mjsBody* child_body = mjs_findBody(spec, (prefix+body_name).c_str());
       mjsFrame* pframe = frame ? frame : mjs_addFrame(body, nullptr);
 
-      if (!child) {
+      if (!child_body) {
         mjSpec* asset = mjs_findSpec(spec, model_name.c_str());
         if (!asset) {
           throw mjXError(elem, "could not find model '%s'", model_name.c_str());
         }
-        child = mjs_findBody(asset, body_name.c_str());
-        if (!child) {
-          throw mjXError(elem, "could not find body '%s''%s'", body_name.c_str());
+        mjsElement* child;
+        if (body_name.empty()) {
+          child = asset->element;
+        } else {
+          child_body = mjs_findBody(asset, body_name.c_str());
+          if (!child_body) {
+            throw mjXError(elem, "could not find body '%s''%s'", body_name.c_str());
+          }
+          child = child_body->element;
         }
-        if (!mjs_attachBody(pframe, child, prefix.c_str(), "")) {
+        if (!mjs_attach(pframe->element, child, prefix.c_str(), "")) {
           throw mjXError(elem, mjs_getError(spec));
         }
       } else {
         // only set frame to existing body
-        mjs_setFrame(child->element, pframe);
+        if (mjs_setFrame(child_body->element, pframe)) {
+          throw mjXError(elem, mjs_getError(spec));
+        }
       }
     }
 
@@ -3789,7 +3801,7 @@ void mjXReader::Tendon(XMLElement* section) {
       def = mjs_getSpecDefault(spec);
     }
 
-    // create equality constraint and parse
+    // create tendon and parse
     mjsTendon* tendon = mjs_addTendon(spec, def);
     OneTendon(elem, tendon);
 

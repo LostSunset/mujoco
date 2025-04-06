@@ -269,7 +269,8 @@ typedef enum mjtObj_ {            // type of MujoCo object
 
   // meta elements, do not appear in mjModel
   mjOBJ_FRAME         = 100,      // frame
-  mjOBJ_DEFAULT                   // default
+  mjOBJ_DEFAULT,                  // default
+  mjOBJ_MODEL                     // entire model
 
 } mjtObj;
 
@@ -1039,6 +1040,7 @@ struct mjModel_ {
   mjtNum*   tendon_margin;        // min distance for limit detection         (ntendon x 1)
   mjtNum*   tendon_stiffness;     // stiffness coefficient                    (ntendon x 1)
   mjtNum*   tendon_damping;       // damping coefficient                      (ntendon x 1)
+  mjtNum*   tendon_armature;      // inertia associated with tendon velocity  (ntendon x 1)
   mjtNum*   tendon_frictionloss;  // loss due to friction                     (ntendon x 1)
   mjtNum*   tendon_lengthspring;  // spring resting length range              (ntendon x 2)
   mjtNum*   tendon_length0;       // tendon length in qpos0                   (ntendon x 1)

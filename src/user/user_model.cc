@@ -166,7 +166,7 @@ static void processlist(mjListKeyMap& ids, vector<T*>& list,
 // constructor
 mjCModel::mjCModel() {
   mjs_defaultSpec(&spec);
-  elemtype = mjOBJ_UNKNOWN;
+  elemtype = mjOBJ_MODEL;
   spec_comment_.clear();
   spec_modelfiledir_.clear();
   spec_meshdir_.clear();
@@ -297,7 +297,7 @@ void mjCModel::CopyList(std::vector<T*>& dest,
     // copy the element from the other model to this model
     if (deepcopy_) {
       source[i]->ForgetKeyframes();
-      candidate->uid = GetUid();
+      candidate->uid = source[i]->uid;
     } else {
       candidate->AddRef();
     }
@@ -558,7 +558,7 @@ void mjCModel::RemoveFromList(std::vector<T*>& list, const mjCModel& other) {
 template <>
 void mjCModel::DeleteAll<mjCKey>(std::vector<mjCKey*>& elements) {
   for (mjCKey* element : elements) {
-    delete element;
+    element->Release();
   }
   elements.clear();
 }
@@ -1553,7 +1553,7 @@ static void DeleteElements(std::vector<T*>& elements,
   int i = 0;
   for (int j=0; j < elements.size(); j++) {
     if (discard[j]) {
-      delete elements[j];
+      elements[j]->Release();
     } else {
       elements[i] = elements[j];
       i++;
@@ -1611,7 +1611,7 @@ void mjCModel::DeleteAll<mjCMaterial>(std::vector<mjCMaterial*>& elements) {
   DeleteMaterial(sites_);
   DeleteMaterial(tendons_);
   for (mjCMaterial* element : elements) {
-    delete element;
+    element->Release();
   }
   elements.clear();
 }
@@ -1621,7 +1621,7 @@ template <>
 void mjCModel::DeleteAll<mjCTexture>(std::vector<mjCTexture*>& elements) {
   DeleteAllTextures(materials_);
   for (mjCTexture* element : elements) {
-    delete element;
+    element->Release();
   }
   elements.clear();
 }
@@ -1781,7 +1781,6 @@ void mjCModel::IndexAssets(bool discard) {
     }
   }
 
-  // discard visual meshes and geoms
   if (discard) {
     std::vector<bool> discard_mesh(meshes_.size(), false);
     std::vector<bool> discard_geom(geoms_.size(), false);
@@ -1795,6 +1794,28 @@ void mjCModel::IndexAssets(bool discard) {
       return geom->IsVisual();
     });
 
+    // update inertia in bodies
+    for (auto body : bodies_) {
+      if (body->spec.explicitinertial) {
+        continue;
+      }
+      for (auto geom : body->geoms) {
+        if (geom->IsVisual()) {
+          if (compiler.inertiafromgeom == mjINERTIAFROMGEOM_TRUE) {
+            compiler.inertiafromgeom = mjINERTIAFROMGEOM_AUTO;
+          }
+          body->explicitinertial = true;  // for XML writer
+          body->spec.explicitinertial = true;
+          body->spec.mass = body->mass;
+          mjuu_copyvec(body->spec.ipos, body->ipos, 3);
+          mjuu_copyvec(body->spec.iquat, body->iquat, 4);
+          mjuu_copyvec(body->spec.inertia, body->inertia, 3);
+          break;
+        }
+      }
+    }
+
+    // discard visual meshes and geoms
     Delete(meshes_, discard_mesh);
     Delete(geoms_, discard_geom);
   }
@@ -2748,31 +2769,6 @@ void mjCModel::CopyTree(mjModel* m) {
     }
   }
   m->nB = nB;
-
-  // set dof_simplenum
-  int count = 0;
-  for (int i=nv-1; i >= 0; i--) {
-    if (m->body_simple[m->dof_bodyid[i]]) {
-      count++;    // increment counter
-    } else {
-      count = 0;  // reset
-    }
-    m->dof_simplenum[i] = count;
-  }
-
-  // compute nC
-  int nOD = 0;  // number of off-diagonal (non-simple) parent dofs
-  for (int i=0; i < nv; i++) {
-    // count ancestor (off-diagonal) dofs
-    if (!m->dof_simplenum[i]) {
-      int j = i;
-      while (j >= 0) {
-        if (j != i) nOD++;
-        j = m->dof_parentid[j];
-      }
-    }
-  }
-  m->nC = nC = nOD + nv;
 }
 
 // copy plugin data
@@ -3369,6 +3365,7 @@ void mjCModel::CopyObjects(mjModel* m) {
     m->tendon_margin[i] = (mjtNum)pte->margin;
     m->tendon_stiffness[i] = (mjtNum)pte->stiffness;
     m->tendon_damping[i] = (mjtNum)pte->damping;
+    m->tendon_armature[i] = (mjtNum)pte->armature;
     m->tendon_frictionloss[i] = (mjtNum)pte->frictionloss;
     m->tendon_lengthspring[2*i] = (mjtNum)pte->springlength[0];
     m->tendon_lengthspring[2*i+1] = (mjtNum)pte->springlength[1];
@@ -3538,6 +3535,54 @@ void mjCModel::CopyObjects(mjModel* m) {
   mjuu_copyvec(qpos0.data(), m->qpos0, nq);
   mjuu_copyvec(body_pos0.data(), m->body_pos, 3*nbody);
   mjuu_copyvec(body_quat0.data(), m->body_quat, 4*nbody);
+}
+
+
+
+// finalize simple bodies/dofs including tendon information
+void mjCModel::FinalizeSimple(mjModel* m) {
+  // demote bodies affected by inertia-bearing tendon to non-simple
+  for (int i=0; i < ntendon; i++) {
+    if (m->tendon_armature[i] == 0) {
+      continue;
+    }
+    int adr = m->tendon_adr[i];
+    int num = m->tendon_num[i];
+    for (int j=adr; j < adr+num; j++) {
+      int objid = m->wrap_objid[j];
+      if (m->wrap_type[j] == mjWRAP_SITE) {
+        m->body_simple[m->site_bodyid[objid]] = 0;
+      }
+      if (m->wrap_type[j] == mjWRAP_CYLINDER || m->wrap_type[j] == mjWRAP_SPHERE) {
+        m->body_simple[m->geom_bodyid[objid]] = 0;
+      }
+    }
+  }
+
+  // set dof_simplenum
+  int count = 0;
+  for (int i=nv-1; i >= 0; i--) {
+    if (m->body_simple[m->dof_bodyid[i]]) {
+      count++;    // increment counter
+    } else {
+      count = 0;  // reset
+    }
+    m->dof_simplenum[i] = count;
+  }
+
+  // compute nC
+  int nOD = 0;  // number of off-diagonal (non-simple) parent dofs
+  for (int i=0; i < nv; i++) {
+    // count ancestor (off-diagonal) dofs
+    if (!m->dof_simplenum[i]) {
+      int j = i;
+      while (j >= 0) {
+        if (j != i) nOD++;
+        j = m->dof_parentid[j];
+      }
+    }
+  }
+  m->nC = nC = nOD + nv;
 }
 
 
@@ -4487,6 +4532,9 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
   // copy objects outsite kinematic tree (including keyframes)
   CopyObjects(m);
 
+  // finalize simple bodies/dofs including tendon information
+  FinalizeSimple(m);
+
   // compute non-zeros in actuator_moment
   m->nJmom = nJmom = CountNJmom(m);
 
@@ -4910,6 +4958,7 @@ bool mjCModel::CopyBack(const mjModel* m) {
     tendons_[i]->margin = (double)m->tendon_margin[i];
     tendons_[i]->stiffness = (double)m->tendon_stiffness[i];
     tendons_[i]->damping = (double)m->tendon_damping[i];
+    tendons_[i]->armature = (double)m->tendon_armature[i];
     tendons_[i]->frictionloss = (double)m->tendon_frictionloss[i];
 
     if (nuser_tendon) {
