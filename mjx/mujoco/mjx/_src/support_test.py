@@ -349,7 +349,7 @@ class SupportTest(parameterized.TestCase):
     self.assertEqual(
         str(e.exception),
         'mjSpec signature does not match mjx.Model signature:'
-        ' 5495345807332648606 != 270010677651259353',
+        ' 17856615236057737915 != 12517827274439268436',
     )
 
   _CONTACTS = """

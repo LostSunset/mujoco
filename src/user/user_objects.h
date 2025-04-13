@@ -219,7 +219,6 @@ class mjCBoundingVolumeHierarchy : public mjCBoundingVolumeHierarchy_ {
 class mjCBase_ : public mjsElement {
  public:
   int id;                 // object id
-  int uid;                // unique identifier
   std::string name;       // object name
   std::string classname;  // defaults class name
   std::string info;       // error message info set by the user
@@ -1524,6 +1523,7 @@ class mjCTendon : public mjCTendon_, private mjsTendon {
   void SetModel(mjCModel* _model);
 
   bool is_limited() const;
+  bool is_actfrclimited() const;
 
  private:
   void Compile(void);                         // compiler

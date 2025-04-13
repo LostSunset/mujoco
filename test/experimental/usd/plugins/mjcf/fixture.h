@@ -21,6 +21,7 @@
 #include "test/fixture.h"
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/sdf/declareHandles.h>
+#include <pxr/usd/sdf/fileFormat.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/usd/usd/common.h>
 #include <pxr/usd/usd/modelAPI.h>
@@ -29,15 +30,41 @@
 #define EXPECT_PRIM_VALID(stage, path) \
   EXPECT_TRUE((stage)->GetPrimAtPath(SdfPath(path)).IsValid());
 
+#define EXPECT_PRIM_IS_A(stage, path, type)                         \
+  {                                                                 \
+    EXPECT_TRUE((stage)->GetPrimAtPath(SdfPath(path)).IsA<type>()); \
+  }
+
+#define EXPECT_PRIM_API_APPLIED(stage, path, api)                     \
+  {                                                                   \
+    EXPECT_TRUE((stage)->GetPrimAtPath(SdfPath(path)).HasAPI<api>()); \
+  }
+
+#define EXPECT_PRIM_API_NOT_APPLIED(stage, path, api)                  \
+  {                                                                    \
+    EXPECT_FALSE((stage)->GetPrimAtPath(SdfPath(path)).HasAPI<api>()); \
+  }
+
 #define EXPECT_PRIM_KIND(stage, path, kind)                          \
   {                                                                  \
     pxr::TfToken prim_kind;                                          \
     pxr::UsdModelAPI::Get(stage, SdfPath(path)).GetKind(&prim_kind); \
     EXPECT_EQ(kind, prim_kind);                                      \
   }
+
+#define EXPECT_PRIM_PURPOSE(stage, path, purpose)    \
+  {                                                  \
+    pxr::TfToken prim_purpose;                       \
+    pxr::UsdGeomImageable::Get(stage, SdfPath(path)) \
+        .GetPurposeAttr()                            \
+        .Get(&prim_purpose);                         \
+    EXPECT_EQ(prim_purpose, purpose);                \
+  }
 namespace mujoco {
 
-pxr::SdfLayerRefPtr LoadLayer(const std::string& xml);
+pxr::SdfLayerRefPtr LoadLayer(
+    const std::string& xml,
+    const pxr::SdfFileFormat::FileFormatArguments& args = {});
 
 template <typename T>
 void ExpectAttributeEqual(pxr::UsdStageRefPtr stage, const char* path,

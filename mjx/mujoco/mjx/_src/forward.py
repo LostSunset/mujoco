@@ -22,6 +22,7 @@ from jax import numpy as jp
 import mujoco
 from mujoco.mjx._src import collision_driver
 from mujoco.mjx._src import constraint
+from mujoco.mjx._src import derivative
 from mujoco.mjx._src import math
 from mujoco.mjx._src import passive
 from mujoco.mjx._src import scan
@@ -38,6 +39,7 @@ from mujoco.mjx._src.types import GainType
 from mujoco.mjx._src.types import IntegratorType
 from mujoco.mjx._src.types import JointType
 from mujoco.mjx._src.types import Model
+from mujoco.mjx._src.types import TrnType
 # pylint: enable=g-importing-member
 import numpy as np
 
@@ -178,6 +180,34 @@ def fwd_actuation(m: Model, d: Data) -> Data:
       jp.array(m.actuator_acc0),
       group_by='u',
   )
+
+  # tendon total force clamping
+  if np.any(m.tendon_actfrclimited):
+    (tendon_actfrclimited_id,) = np.nonzero(m.tendon_actfrclimited)
+    actuator_tendon = m.actuator_trntype == TrnType.TENDON
+
+    force_mask = [
+        actuator_tendon & (m.actuator_trnid[:, 0] == tendon_id)
+        for tendon_id in tendon_actfrclimited_id
+    ]
+    force_ids = np.concatenate([np.nonzero(mask)[0] for mask in force_mask])
+    force_mat = np.array(force_mask)[:, force_ids]
+    tendon_total_force = force_mat @ force[force_ids]
+
+    force_scaling = jp.where(
+        tendon_total_force < m.tendon_actfrcrange[tendon_actfrclimited_id, 0],
+        m.tendon_actfrcrange[tendon_actfrclimited_id, 0] / tendon_total_force,
+        1,
+    )
+    force_scaling = jp.where(
+        tendon_total_force > m.tendon_actfrcrange[tendon_actfrclimited_id, 1],
+        m.tendon_actfrcrange[tendon_actfrclimited_id, 1] / tendon_total_force,
+        force_scaling,
+    )
+
+    tendon_forces = force[force_ids] * (force_mat.T @ force_scaling)
+    force = force.at[force_ids].set(tendon_forces)
+
   forcerange = jp.where(
       m.actuator_forcelimited[:, None],
       m.actuator_forcerange,
@@ -363,29 +393,7 @@ def rungekutta4(m: Model, d: Data) -> Data:
 def implicit(m: Model, d: Data) -> Data:
   """Integrates fully implicit in velocity."""
 
-  qderiv = None
-
-  # qDeriv += d qfrc_actuator / d qvel
-  if not m.opt.disableflags & DisableBit.ACTUATION:
-    affine_bias = m.actuator_biastype == BiasType.AFFINE
-    bias_vel = m.actuator_biasprm[:, 2] * affine_bias
-    affine_gain = m.actuator_gaintype == GainType.AFFINE
-    gain_vel = m.actuator_gainprm[:, 2] * affine_gain
-    ctrl = d.ctrl.at[m.actuator_dyntype != DynType.NONE].set(d.act)
-    vel = bias_vel + gain_vel * ctrl
-    qderiv = d.actuator_moment.T @ jp.diag(vel) @ d.actuator_moment
-
-  # qDeriv += d qfrc_passive / d qvel
-  if not m.opt.disableflags & DisableBit.PASSIVE:
-    if qderiv is None:
-      qderiv = -jp.diag(m.dof_damping)
-    else:
-      qderiv -= jp.diag(m.dof_damping)
-    if m.ntendon:
-      qderiv -= d.ten_J.T @ jp.diag(m.tendon_damping) @ d.ten_J
-    # TODO(robotics-simulation): fluid drag model
-    if m.opt.has_fluid_params:
-      raise NotImplementedError('fluid drag not supported for implicitfast')
+  qderiv = derivative.deriv_smooth_vel(m, d)
 
   qacc = d.qacc
   if qderiv is not None:
