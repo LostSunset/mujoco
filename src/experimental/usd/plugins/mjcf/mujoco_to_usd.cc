@@ -66,7 +66,6 @@ using TfStaticData = pxr::TfStaticData<T>;
 
 // clang-format off
 TF_DEFINE_PRIVATE_TOKENS(kTokens,
-                         // Xform ops
                          ((body, "Body"))
                          ((body_name, "mujoco:body_name"))
                          ((geom, "Geom"))
@@ -89,7 +88,8 @@ TF_DEFINE_PRIVATE_TOKENS(kTokens,
                          ((outputsRgb, "outputs:rgb"))
                          ((inputsMetallic, "inputs:metallic"))
                          (repeat)
-                         );
+                         ((sourceMesh, pxr::UsdGeomTokens->Mesh))
+                        );
 
 // Using to satisfy TF_REGISTRY_FUNCTION macro below and avoid operating in PXR_NS.
 using pxr::TfEnum;
@@ -98,6 +98,9 @@ using pxr::Tf_RegistryInit;
 using pxr::TfEnum;
 template <typename T>
 using Arch_PerLibInit = pxr::Arch_PerLibInit<T>;
+#if defined(ARCH_OS_DARWIN)
+using Arch_ConstructorEntry = pxr::Arch_ConstructorEntry;
+#endif
 enum ErrorCodes { UnsupportedGeomTypeError, MujocoCompilationError };
 
 TF_REGISTRY_FUNCTION(pxr::TfEnum) {
@@ -327,7 +330,7 @@ class ModelWriter {
     pxr::SdfPath subcomponent_path =
         CreatePrimSpec(data_, parent_path, name, pxr::UsdGeomTokens->Xform);
     pxr::SdfPath mesh_path =
-        CreatePrimSpec(data_, subcomponent_path, pxr::UsdGeomTokens->Mesh,
+        CreatePrimSpec(data_, subcomponent_path, kTokens->sourceMesh,
                        pxr::UsdGeomTokens->Mesh);
     mesh_paths_[*mesh->name] = subcomponent_path;
 
@@ -597,7 +600,15 @@ class ModelWriter {
     // Reference the mesh asset written in WriteMeshes.
     AddPrimReference(data_, subcomponent_path, mesh_paths_[*geom->meshname]);
 
-    return subcomponent_path;
+    // We want to use instancing with meshes, and it requires creating a parent
+    // scope to be referenced, with the Mesh prim as a child.
+    // To be able to actually manipulate the Mesh prim, we need to create and
+    // return the corresponding `over` prim as a child of the referencing prim.
+    pxr::SdfPath over_mesh_path =
+        CreatePrimSpec(data_, subcomponent_path, kTokens->sourceMesh,
+                       pxr::UsdGeomTokens->Mesh, pxr::SdfSpecifierOver);
+
+    return over_mesh_path;
   }
 
   pxr::SdfPath WriteSiteGeom(const mjsSite *site,
@@ -673,15 +684,15 @@ class ModelWriter {
     pxr::SdfPath capsule_path =
         CreatePrimSpec(data_, body_path, name, pxr::UsdGeomTokens->Capsule);
 
-    // MuJoCo uses half sizes.
     pxr::SdfPath radius_attr_path =
         CreateAttributeSpec(data_, capsule_path, pxr::UsdGeomTokens->radius,
                             pxr::SdfValueTypeNames->Float);
-    SetAttributeDefault(data_, radius_attr_path, size[0] * 2);
+    SetAttributeDefault(data_, radius_attr_path, size[0]);
 
     pxr::SdfPath height_attr_path =
         CreateAttributeSpec(data_, capsule_path, pxr::UsdGeomTokens->height,
                             pxr::SdfValueTypeNames->Float);
+    // MuJoCo uses half sizes.
     SetAttributeDefault(data_, height_attr_path, size[1] * 2);
     return capsule_path;
   }
@@ -701,15 +712,15 @@ class ModelWriter {
     pxr::SdfPath cylinder_path =
         CreatePrimSpec(data_, body_path, name, pxr::UsdGeomTokens->Cylinder);
 
-    // MuJoCo uses half sizes.
     pxr::SdfPath radius_attr_path =
         CreateAttributeSpec(data_, cylinder_path, pxr::UsdGeomTokens->radius,
                             pxr::SdfValueTypeNames->Float);
-    SetAttributeDefault(data_, radius_attr_path, size[0] * 2);
+    SetAttributeDefault(data_, radius_attr_path, size[0]);
 
     pxr::SdfPath height_attr_path =
         CreateAttributeSpec(data_, cylinder_path, pxr::UsdGeomTokens->height,
                             pxr::SdfValueTypeNames->Float);
+    // MuJoCo uses half sizes.
     SetAttributeDefault(data_, height_attr_path, size[1] * 2);
     return cylinder_path;
   }
@@ -729,11 +740,10 @@ class ModelWriter {
     pxr::SdfPath ellipsoid_path =
         CreatePrimSpec(data_, body_path, name, pxr::UsdGeomTokens->Sphere);
 
-    pxr::GfVec3f scale = {static_cast<float>(size[0] * 2),
-                          static_cast<float>(size[1] * 2),
-                          static_cast<float>(size[2] * 2)};
+    pxr::GfVec3f scale = {static_cast<float>(size[0]),
+                          static_cast<float>(size[1]),
+                          static_cast<float>(size[2])};
 
-    // MuJoCo uses half sizes.
     pxr::SdfPath radius_attr_path =
         CreateAttributeSpec(data_, ellipsoid_path, pxr::UsdGeomTokens->radius,
                             pxr::SdfValueTypeNames->Float);
@@ -760,11 +770,10 @@ class ModelWriter {
     pxr::SdfPath sphere_path =
         CreatePrimSpec(data_, body_path, name, pxr::UsdGeomTokens->Sphere);
 
-    // MuJoCo uses half sizes.
     pxr::SdfPath radius_attr_path =
         CreateAttributeSpec(data_, sphere_path, pxr::UsdGeomTokens->radius,
                             pxr::SdfValueTypeNames->Float);
-    SetAttributeDefault(data_, radius_attr_path, size[0] * 2);
+    SetAttributeDefault(data_, radius_attr_path, size[0]);
     return sphere_path;
   }
 
@@ -834,7 +843,7 @@ class ModelWriter {
         site_path, pxr::VtArray<pxr::TfToken>{kTokens->xformOpTransform});
   }
 
-  void WriteGeom(mjsGeom *geom, const mjsBody *body) {
+  void WriteGeom(mjsGeom *geom, const mjsBody *body, bool write_physics) {
     const int body_id = mjs_getId(body->element);
     const auto &body_path = body_paths_[body_id];
 
@@ -866,6 +875,29 @@ class ModelWriter {
         TF_WARN(UnsupportedGeomTypeError, "Unsupported geom type for geom %d",
                 geom_id);
         return;
+    }
+
+    // Apply the PhysicsCollisionAPI schema if we are writing physics and the
+    // geom participates in collisions.
+    if (write_physics && (model_->geom_contype[geom_id] != 0 ||
+                          model_->geom_conaffinity[geom_id] != 0)) {
+      ApplyApiSchema(data_, geom_path,
+                     pxr::UsdPhysicsTokens->PhysicsCollisionAPI);
+      // For meshes, also apply PhysicsMeshCollisionAPI and set the
+      // approximation attribute.
+      if (geom->type == mjGEOM_MESH) {
+        ApplyApiSchema(data_, geom_path,
+                       pxr::UsdPhysicsTokens->PhysicsMeshCollisionAPI);
+
+        // Note: MuJoCo documentation states that for collision purposes, meshes
+        // are always replaced with their convex hulls. Therefore, we set the
+        // approximation attribute to convexHull explicitly.
+        pxr::SdfPath approximation_attr = CreateAttributeSpec(
+            data_, geom_path, pxr::UsdPhysicsTokens->physicsApproximation,
+            pxr::SdfValueTypeNames->Token, pxr::SdfVariabilityUniform);
+        SetAttributeDefault(data_, approximation_attr,
+                            pxr::UsdPhysicsTokens->convexHull);
+      }
     }
 
     mjsDefault *spec_default = mjs_getDefault(geom->element);
@@ -942,10 +974,10 @@ class ModelWriter {
     }
   }
 
-  void WriteGeoms(mjsBody *body) {
+  void WriteGeoms(mjsBody *body, bool write_physics) {
     mjsGeom *geom = mjs_asGeom(mjs_firstChild(body, mjOBJ_GEOM, false));
     while (geom) {
-      WriteGeom(geom, body);
+      WriteGeom(geom, body, write_physics);
       geom = mjs_asGeom(mjs_nextChild(body, geom->element, false));
     }
   }
@@ -1108,7 +1140,7 @@ class ModelWriter {
         WriteBody(body, write_physics);
       }
       WriteSites(body);
-      WriteGeoms(body);
+      WriteGeoms(body, write_physics);
       WriteCameras(body);
       WriteLights(body);
       body = mjs_asBody(mjs_nextElement(spec_, body->element));

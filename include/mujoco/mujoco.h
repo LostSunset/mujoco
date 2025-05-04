@@ -16,7 +16,7 @@
 #define MUJOCO_MUJOCO_H_
 
 // header version; should match the library version as returned by mj_version()
-#define mjVERSION_HEADER 332
+#define mjVERSION_HEADER 333
 
 // needed to define size_t, fabs and log10
 #include <stdlib.h>
@@ -1621,6 +1621,9 @@ MJAPI const char* mjs_getString(const mjString* source);
 
 // Get double array contents and optionally its size.
 MJAPI const double* mjs_getDouble(const mjDoubleVec* source, int* size);
+
+// Get plugin attributes.
+MJAPI const void* mjs_getPluginAttributes(const mjsPlugin* plugin);
 
 
 //---------------------------------- Spec utilities ------------------------------------------------
