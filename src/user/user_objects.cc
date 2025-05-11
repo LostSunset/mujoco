@@ -75,14 +75,19 @@ PNGImage PNGImage::Load(const mjCBase* obj, mjResource* resource,
   image.color_type_ = color_type;
   mjCCache *cache = reinterpret_cast<mjCCache*>(mj_globalCache());
 
+  // cache callback
+  auto callback = [&image](const void* data) {
+    const PNGImage *cached_image = static_cast<const PNGImage*>(data);
+    if (cached_image->color_type_ == image.color_type_) {
+      image = *cached_image;
+      return true;
+    }
+    return false;
+  };
+
   // try loading from cache
-  if (cache && cache->PopulateData(resource, [&image](const void* data) {
-      const PNGImage *cached_image = static_cast<const PNGImage*>(data);
-      if (cached_image->color_type_ == image.color_type_) {
-        image = *cached_image;
-      }
-    })) {
-    if (!image.data_.empty()) return image;
+  if (cache && cache->PopulateData(resource, callback)) {
+      return image;
   }
 
   // open PNG resource
@@ -779,15 +784,14 @@ void mjCBase::SetFrame(mjCFrame* _frame) {
   frame = _frame;
 }
 
-
-void mjCBase::SetUserValue(std::string_view key, const void* data) {
-  user_payload_[std::string(key)] = data;
+void mjCBase::SetUserValue(std::string_view key, const void* data,
+                           void (*cleanup)(const void*)) {
+  user_payload_[std::string(key)] = UserValue(data, cleanup);
 }
-
 
 const void* mjCBase::GetUserValue(std::string_view key) {
   auto found = user_payload_.find(std::string(key));
-  return found != user_payload_.end() ? found->second : nullptr;
+  return found != user_payload_.end() ? found->second.value : nullptr;
 }
 
 

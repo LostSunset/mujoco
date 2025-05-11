@@ -2,13 +2,23 @@
 Changelog
 =========
 
-Version 3.3.2 (April 28, 2025)
+Upcoming version (not yet release)
 ----------------------------------
+
+General
+^^^^^^^
+- Refactored island implementation so that island data is memory-contiguous. This speeds up island processing in the
+  solver and clears the way for the addition of the Newton and PGS solvers (currently only CG is supported).
+
+Version 3.3.2 (April 28, 2025)
+------------------------------
 
 MJX
 ^^^
 1. Added inverse dynamics.
 2. Added tendon actuator force sensor.
+3. Fix :github:issue:`2606` such that ``make_data`` copies over ``mocap_pos`` and ``mocap_quat``
+   from ``body_pos`` and ``body_quat``.
 
 Version 3.3.1 (Apr 9, 2025)
 ----------------------------
