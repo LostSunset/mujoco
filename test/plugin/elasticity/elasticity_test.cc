@@ -65,11 +65,8 @@ TEST_F(ElasticityTest, ElasticEnergyShell) {
   <worldbody>
     <flexcomp type="grid" count="8 8 1" spacing="1 1 1"
               radius=".025" name="test" dim="2">
-      <plugin plugin="mujoco.elasticity.shell">
-        <config key="poisson" value="0"/>
-        <config key="young" value="2"/>
-        <config key="thickness" value="1"/>
-      </plugin>
+      <elasticity young="2" poisson="0" thickness="1"/>
+      <plugin plugin="mujoco.elasticity.shell"/>
     </flexcomp>
   </worldbody>
   </mujoco>
@@ -83,8 +80,10 @@ TEST_F(ElasticityTest, ElasticEnergyShell) {
 
   // check that a plane is in the kernel of the energy
   for (mjtNum scale = 1; scale < 4; scale++) {
-    for (int e = 0; e < shell->ne; e++) {
-      int* v = shell->flaps[e].vertices;
+    for (int e = 0; e < m->flex_edgenum[0]; e++) {
+      int* edge = m->flex_edge + 2*(m->flex_edgeadr[0] + e);
+      int* flap = m->flex_edgeflap + 2*(m->flex_edgeadr[0] + e);
+      int v[4] = {edge[0], edge[1], flap[0], flap[1]};
       if (v[3]== -1) {
         continue;
       }
@@ -95,7 +94,7 @@ TEST_F(ElasticityTest, ElasticEnergyShell) {
           for (int x = 0; x < 3; x++) {
             mjtNum elongation1 = scale * shell->position[3*v[i]+x];
             mjtNum elongation2 = scale * shell->position[3*v[j]+x];
-            energy += shell->bending[16*e+4*i+j] * elongation1 * elongation2;
+            energy += m->flex_bending[16*e+4*i+j] * elongation1 * elongation2;
           }
         }
       }
@@ -115,7 +114,7 @@ TEST_F(PluginTest, ElasticEnergyMembrane) {
   <worldbody>
     <flexcomp type="grid" count="8 8 1" spacing="1 1 1"
               radius=".025" name="test" dim="2">
-      <elasticity young="2" poisson="0" thickness="1"/>
+      <elasticity young="2" poisson="0" thickness="1" elastic2d="2"/>
       <edge equality="false"/>
     </flexcomp>
   </worldbody>
@@ -157,31 +156,6 @@ TEST_F(PluginTest, ElasticEnergyMembrane) {
 
   mj_deleteData(d);
   mj_deleteModel(m);
-}
-
-TEST_F(ElasticityTest, InvalidThickness) {
-  static constexpr char xml[] = R"(
-  <mujoco>
-  <extension>
-    <plugin plugin="mujoco.elasticity.shell"/>
-  </extension>
-
-  <worldbody>
-    <flexcomp type="grid" count="2 2 1" spacing="1 1 1"
-              radius=".025" name="test" dim="2">
-      <plugin plugin="mujoco.elasticity.shell">
-        <config key="thickness" value="hello"/>
-      </plugin>
-      <edge equality="false"/>
-    </flexcomp>
-  </worldbody>
-  </mujoco>
-  )";
-
-  char error[1024] = {0};
-  mjModel* m = LoadModelFromString(xml, error, sizeof(error));
-  ASSERT_THAT(m, testing::IsNull());
-  EXPECT_THAT(error, ::testing::HasSubstr("Invalid parameter"));
 }
 
 // -------------------------------- solid -----------------------------------

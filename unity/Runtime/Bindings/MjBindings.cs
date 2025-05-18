@@ -419,6 +419,12 @@ public enum mjtFlexSelf : int{
   mjFLEXSELF_SAP = 3,
   mjFLEXSELF_AUTO = 4,
 }
+public enum mjtSDFType : int{
+  mjSDFTYPE_SINGLE = 0,
+  mjSDFTYPE_INTERSECTION = 1,
+  mjSDFTYPE_MIDSURFACE = 2,
+  mjSDFTYPE_COLLISION = 3,
+}
 public enum mjtPluginCapabilityBit : int{
   mjPLUGIN_ACTUATOR = 1,
   mjPLUGIN_SENSOR = 2,
@@ -4923,6 +4929,7 @@ public unsafe struct mjData_ {
   public double* actuator_moment;
   public double* crb;
   public double* qM;
+  public double* M;
   public double* qLD;
   public double* qLDiagInv;
   public double* bvh_aabb_dyn;
@@ -4949,10 +4956,6 @@ public unsafe struct mjData_ {
   public int* M_rowadr;
   public int* M_colind;
   public int* mapM2M;
-  public int* C_rownnz;
-  public int* C_rowadr;
-  public int* C_colind;
-  public int* mapM2C;
   public int* D_rownnz;
   public int* D_rowadr;
   public int* D_diag;
@@ -5001,7 +5004,6 @@ public unsafe struct mjData_ {
   public double* iacc_smooth;
   public int* iM_rownnz;
   public int* iM_rowadr;
-  public int* iM_diagnum;
   public int* iM_colind;
   public double* iM;
   public double* iLD;
@@ -5430,6 +5432,8 @@ public unsafe struct mjModel_ {
   public byte* light_directional;
   public byte* light_castshadow;
   public float* light_bulbradius;
+  public float* light_intensity;
+  public float* light_range;
   public byte* light_active;
   public double* light_pos;
   public double* light_dir;
@@ -5477,6 +5481,7 @@ public unsafe struct mjModel_ {
   public int* flex_nodebodyid;
   public int* flex_vertbodyid;
   public int* flex_edge;
+  public int* flex_edgeflap;
   public int* flex_elem;
   public int* flex_elemtexcoord;
   public int* flex_elemedge;
@@ -5491,6 +5496,7 @@ public unsafe struct mjModel_ {
   public double* flexedge_invweight0;
   public double* flex_radius;
   public double* flex_stiffness;
+  public double* flex_bending;
   public double* flex_damping;
   public double* flex_edgestiffness;
   public double* flex_edgedamping;
@@ -6073,6 +6079,8 @@ public unsafe struct mjvLight_ {
   public byte directional;
   public byte castshadow;
   public float bulbradius;
+  public float intensity;
+  public float range;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -6353,6 +6361,8 @@ public unsafe struct model {
   public byte* light_directional;
   public byte* light_castshadow;
   public float* light_bulbradius;
+  public float* light_intensity;
+  public float* light_range;
   public byte* light_active;
   public float* light_attenuation;
   public float* light_cutoff;

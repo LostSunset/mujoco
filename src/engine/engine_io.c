@@ -1139,9 +1139,6 @@ static void copyM2Sparse(const mjModel* m, mjData* d, int* dst, const int* src,
   const int* rownnz;
   const int* rowadr;
   if (reduced && !upper) {
-    rownnz = d->C_rownnz;
-    rowadr = d->C_rowadr;
-  } else if (!reduced && !upper) {
     rownnz = d->M_rownnz;
     rowadr = d->M_rowadr;
   } else if (!reduced && upper) {
@@ -1251,24 +1248,13 @@ static void makeDofDofmaps(const mjModel* m, mjData* d) {
   }
 
   // make mapM2C
-  for (int i=0; i < nC; i++) d->mapM2C[i] = -1;
-  copyM2Sparse(m, d, d->mapM2C, M, /*reduced=*/1, /*upper=*/0);
+  for (int i=0; i < nC; i++) d->mapM2M[i] = -1;
+  copyM2Sparse(m, d, d->mapM2M, M, /*reduced=*/1, /*upper=*/0);
 
   // check that all indices are filled in
   for (int i=0; i < nC; i++) {
-    if (d->mapM2C[i] < 0) {
-      mjERROR("unassigned index in mapM2C");
-    }
-  }
-
-  // make mapM2M
-  for (int i=0; i < nM; i++) d->mapM2M[i] = -1;
-  copyM2Sparse(m, d, d->mapM2M, M, /*reduced=*/0, /*upper=*/0);
-
-  // check that all indices are filled in
-  for (int i=0; i < nM; i++) {
     if (d->mapM2M[i] < 0) {
-      mjERROR("unassigned index in mapM2M");
+      mjERROR("unassigned index in mapM2C");
     }
   }
 
@@ -1989,9 +1975,8 @@ static void _resetData(const mjModel* m, mjData* d, unsigned char debug_value) {
     makeBSparse(m, d);
     checkDBSparse(m, d);
 
-    // make M, C
-    makeDofDofSparse(m, d, d->M_rownnz, d->M_rowadr, NULL, d->M_colind, /*reduced=*/0, /*upper=*/0);
-    makeDofDofSparse(m, d, d->C_rownnz, d->C_rowadr, NULL, d->C_colind, /*reduced=*/1, /*upper=*/0);
+    // make C
+    makeDofDofSparse(m, d, d->M_rownnz, d->M_rowadr, NULL, d->M_colind, /*reduced=*/1, /*upper=*/0);
 
     // make index mappings: mapM2D, mapD2M, mapM2C, mapM2M
     makeDofDofmaps(m, d);

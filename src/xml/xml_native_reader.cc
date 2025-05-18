@@ -167,8 +167,9 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"camera", "?", "17", "orthographic", "fovy", "ipd", "resolution", "pos", "quat",
             "axisangle", "xyaxes", "zaxis", "euler", "mode", "focal", "focalpixel",
             "principal", "principalpixel", "sensorsize", "user"},
-        {"light", "?", "13", "pos", "dir", "bulbradius", "directional", "castshadow", "active",
-            "attenuation", "cutoff", "exponent", "ambient", "diffuse", "specular", "mode"},
+        {"light", "?", "15", "pos", "dir", "bulbradius", "intensity", "range",
+            "directional", "castshadow", "active", "attenuation", "cutoff", "exponent",
+            "ambient", "diffuse", "specular", "mode"},
         {"pair", "?", "7", "condim", "friction", "solref", "solreffriction", "solimp",
          "gap", "margin"},
         {"equality", "?", "3", "active", "solref", "solimp"},
@@ -280,9 +281,9 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"camera", "*", "20", "name", "class", "orthographic", "fovy", "ipd", "resolution", "pos",
             "quat", "axisangle", "xyaxes", "zaxis", "euler", "mode", "target",
             "focal", "focalpixel", "principal", "principalpixel", "sensorsize", "user"},
-        {"light", "*", "16", "name", "class", "directional", "castshadow", "active",
-            "pos", "dir", "bulbradius", "attenuation", "cutoff", "exponent", "ambient", "diffuse",
-            "specular", "mode", "target"},
+        {"light", "*", "18", "name", "class", "directional", "castshadow", "active",
+            "pos", "dir", "bulbradius", "intensity", "range", "attenuation", "cutoff",
+            "exponent", "ambient", "diffuse", "specular", "mode", "target"},
         {"plugin", "*", "2", "plugin", "instance"},
         {"<"},
           {"config", "*", "2", "key", "value"},
@@ -310,10 +311,10 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
             "flatskin", "pos", "quat", "axisangle", "xyaxes", "zaxis", "euler", "origin"},
         {"<"},
             {"edge", "?", "5", "equality", "solref", "solimp", "stiffness", "damping"},
-            {"elasticity", "?", "4", "young", "poisson", "damping", "thickness"},
-            {"contact", "?", "13", "contype", "conaffinity", "condim", "priority",
+            {"elasticity", "?", "5", "young", "poisson", "damping", "thickness", "elastic2d"},
+            {"contact", "?", "14", "contype", "conaffinity", "condim", "priority",
                 "friction", "solmix", "solref", "solimp", "margin", "gap",
-                "internal", "selfcollide", "activelayers"},
+                "internal", "selfcollide", "activelayers", "vertcollide"},
             {"pin", "*", "4", "id", "range", "grid", "gridrange"},
             {"plugin", "*", "2", "plugin", "instance"},
             {"<"},
@@ -327,11 +328,11 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"flex", "*", "13", "name", "group", "dim", "radius", "material",
             "rgba", "flatskin", "body", "vertex", "element", "texcoord", "elemtexcoord", "node"},
         {"<"},
-            {"contact", "?", "13", "contype", "conaffinity", "condim", "priority",
+            {"contact", "?", "14", "contype", "conaffinity", "condim", "priority",
                 "friction", "solmix", "solref", "solimp", "margin", "gap",
-                "internal", "selfcollide", "activelayers"},
+                "internal", "selfcollide", "activelayers", "vertcollide"},
             {"edge", "?", "2", "stiffness", "damping"},
-            {"elasticity", "?", "4", "young", "poisson", "damping", "thickness"},
+            {"elasticity", "?", "5", "young", "poisson", "damping", "thickness", "elastic2d"},
         {">"},
         {"skin", "*", "9", "name", "file", "material", "rgba", "inflate",
             "vertex", "texcoord", "face", "group"},
@@ -1380,6 +1381,9 @@ void mjXReader::OneFlex(XMLElement* elem, mjsFlex* flex) {
       flex->internal = (n == 1);
     }
     MapValue(cont, "selfcollide", &flex->selfcollide, flexself_map, 5);
+    if (MapValue(cont, "vertcollide", &flex->vertcollide, bool_map, 2)) {
+      flex->vertcollide = (n == 1);
+    }
     ReadAttrInt(cont, "activelayers", &flex->activelayers);
   }
 
@@ -1397,6 +1401,7 @@ void mjXReader::OneFlex(XMLElement* elem, mjsFlex* flex) {
     ReadAttr(elasticity, "poisson", 1, &flex->poisson, text);
     ReadAttr(elasticity, "thickness", 1, &flex->thickness, text);
     ReadAttr(elasticity, "damping", 1, &flex->damping, text);
+    ReadAttr(elasticity, "elastic2d", 1, &flex->elastic2d, text);
   }
 
   // write error info
@@ -1853,6 +1858,8 @@ void mjXReader::OneLight(XMLElement* elem, mjsLight* light) {
   ReadAttr(elem, "pos", 3, light->pos, text);
   ReadAttr(elem, "dir", 3, light->dir, text);
   ReadAttr(elem, "bulbradius", 1, &light->bulbradius, text);
+  ReadAttr(elem, "intensity", 1, &light->intensity, text);
+  ReadAttr(elem, "range", 1, &light->range, text);
   ReadAttr(elem, "attenuation", 3, light->attenuation, text);
   ReadAttr(elem, "cutoff", 1, &light->cutoff, text);
   ReadAttr(elem, "exponent", 1, &light->exponent, text);
@@ -2658,10 +2665,11 @@ void mjXReader::OneFlexcomp(XMLElement* elem, mjsBody* body, const mjVFS* vfs) {
     ReadAttr(elasticity, "poisson", 1, &dflex.poisson, text);
     ReadAttr(elasticity, "damping", 1, &dflex.damping, text);
     ReadAttr(elasticity, "thickness", 1, &dflex.thickness, text);
+    ReadAttr(elasticity, "elastic2d", 1, &dflex.elastic2d, text);
   }
 
   // check errors
-  if (elasticity && fcomp.equality) {
+  if (dflex.elastic2d >= 2 && fcomp.equality) {
     throw mjXError(elem, "elasticity and edge constraints cannot both be present");
   }
 
@@ -2682,6 +2690,9 @@ void mjXReader::OneFlexcomp(XMLElement* elem, mjsBody* body, const mjVFS* vfs) {
       dflex.internal = (n == 1);
     }
     MapValue(cont, "selfcollide", &dflex.selfcollide, flexself_map, 5);
+    if (MapValue(cont, "vertcollide", &n, bool_map, 2)) {
+      dflex.vertcollide = (n == 1);
+    }
     ReadAttrInt(cont, "activelayers", &dflex.activelayers);
   }
 

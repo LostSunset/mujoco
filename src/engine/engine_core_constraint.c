@@ -2075,11 +2075,11 @@ void mj_projectConstraint(const mjModel* m, mjData* d) {
           continue;
         }
 
-        // traverse row j of M, marking new unique nonzeros
-        int nnzM = d->M_rownnz[j];
-        int adrM = d->M_rowadr[j];
-        for (int k=0; k < nnzM; k++) {
-          int c = d->M_colind[adrM + k];
+        // traverse row j of C, marking new unique nonzeros
+        int nnzC = d->M_rownnz[j];
+        int adrC = d->M_rowadr[j];
+        for (int k=0; k < nnzC; k++) {
+          int c = d->M_colind[adrC + k];
           if (marker[c] != r) {
             marker[c] = r;
             nnz++;
@@ -2159,10 +2159,10 @@ void mj_projectConstraint(const mjModel* m, mjData* d) {
           continue;
         }
         int j = B_colind[i];
-        int adrM = d->M_rowadr[j];
-        mju_addToSclSparseInc(B + adrB, d->qLD + adrM,
+        int adrC = d->M_rowadr[j];
+        mju_addToSclSparseInc(B + adrB, d->qLD + adrC,
                               nnzB, B_colind + adrB,
-                              d->M_rownnz[j]-1, d->M_colind + adrM, -b);
+                              d->M_rownnz[j]-1, d->M_colind + adrC, -b);
       }
 
       // B(r,:) <- sqrt(inv(D)) * B(r,:)
@@ -2286,7 +2286,7 @@ void mj_referenceConstraint(const mjModel* m, mjData* d) {
 //---------------------------- update constraint state ---------------------------------------------
 
 // compute efc_state, efc_force
-//  optional: cost(qacc) = shat(jar); cone Hessians
+//  optional: cost(qacc) = s_hat(jar); cone Hessians
 void mj_constraintUpdate_impl(int ne, int nf, int nefc,
                               const mjtNum* D, const mjtNum* R, const mjtNum* floss,
                               const mjtNum* jar, const int* type, const int* id,
@@ -2485,7 +2485,7 @@ void mj_constraintUpdate_impl(int ne, int nf, int nefc,
 
 
 // compute efc_state, efc_force, qfrc_constraint
-// optional: cost(qacc) = shat(jar) where jar = Jac*qacc-aref; cone Hessians
+// optional: cost(qacc) = s_hat(jar) where jar = Jac*qacc-aref; cone Hessians
 void mj_constraintUpdate(const mjModel* m, mjData* d, const mjtNum* jar,
                          mjtNum cost[1], int flg_coneHessian) {
   mj_constraintUpdate_impl(d->ne, d->nf, d->nefc, d->efc_D, d->efc_R, d->efc_frictionloss,

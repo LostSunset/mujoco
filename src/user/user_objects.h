@@ -830,6 +830,11 @@ class mjCLight : public mjCLight_, private mjsLight {
 //------------------------- class mjCFlex ----------------------------------------------------------
 // Describes a flex
 
+struct StencilFlap {
+  static constexpr int kNumVerts = 4;
+  int vertices[kNumVerts];
+};
+
 class mjCFlex_ : public mjCBase {
  protected:
   int nvert;                              // number of vertices
@@ -846,11 +851,13 @@ class mjCFlex_ : public mjCBase {
   std::vector<int> shell;                 // shell fragment vertex ids (dim per fragment)
   std::vector<int> elemlayer;             // element layer (distance from border)
   std::vector<int> evpair;                // element-vertex pairs
+  std::vector<StencilFlap> flaps;         // adjacent triangles
   std::vector<double> vertxpos;           // global vertex positions
   mjCBoundingVolumeHierarchy tree;        // bounding volume hierarchy
   std::vector<double> elemaabb_;          // element bounding volume
   std::vector<int> edgeidx_;              // element edge ids
   std::vector<double> stiffness;          // elasticity stiffness matrix
+  std::vector<double> bending;            // bending stiffness matrix
 
   // variable-size data
   std::vector<std::string> vertbody_;     // vertex body names
