@@ -526,6 +526,12 @@ typedef enum mjtCamLight_ {       // tracking mode for camera and light
   mjCAMLIGHT_TARGETBODY,          // pos fixed in body, rot tracks target body
   mjCAMLIGHT_TARGETBODYCOM        // pos fixed in body, rot tracks target subtree com
 } mjtCamLight;
+typedef enum mjtLightType_ {      // type of light
+  mjLIGHT_SPOT    = 0,            // spot
+  mjLIGHT_DIRECTIONAL,            // directional
+  mjLIGHT_POINT,                  // point
+  mjLIGHT_IMAGE,                  // image-based
+} mjtLightType;
 typedef enum mjtTexture_ {        // type of texture
   mjTEXTURE_2D        = 0,        // 2d texture, suitable for planes and hfields
   mjTEXTURE_CUBE,                 // cube texture, suitable for all other geom types
@@ -544,6 +550,11 @@ typedef enum mjtTextureRole_ {    // role of texture map in rendering
   mjTEXROLE_ORM,                  // occlusion, roughness, metallic
   mjNTEXROLE
 } mjtTextureRole;
+typedef enum mjtColorSpace_ {     // type of color space encoding
+  mjCOLORSPACE_AUTO   = 0,        // attempts to autodetect color space, defaults to linear
+  mjCOLORSPACE_LINEAR,            // linear color space
+  mjCOLORSPACE_SRGB               // standard RGB color space
+} mjtColorSpace;
 typedef enum mjtIntegrator_ {     // integrator mode
   mjINT_EULER         = 0,        // semi-implicit Euler
   mjINT_RK4,                      // 4th-order Runge Kutta
@@ -1174,7 +1185,7 @@ struct mjModel_ {
   int*      light_mode;           // light tracking mode (mjtCamLight)        (nlight x 1)
   int*      light_bodyid;         // id of light's body                       (nlight x 1)
   int*      light_targetbodyid;   // id of targeted body; -1: none            (nlight x 1)
-  mjtByte*  light_directional;    // directional light                        (nlight x 1)
+  int*      light_type;           // spot, directional, etc. (mjtLightType)   (nlight x 1)
   mjtByte*  light_castshadow;     // does light cast shadows                  (nlight x 1)
   float*    light_bulbradius;     // light radius for soft shadows            (nlight x 1)
   float*    light_intensity;      // intensity, in candela                    (nlight x 1)
@@ -1326,6 +1337,7 @@ struct mjModel_ {
 
   // textures
   int*      tex_type;             // texture type (mjtTexture)                (ntex x 1)
+  int*      tex_colorspace;       // texture colorspace (mjtColorSpace)       (ntex x 1)
   int*      tex_height;           // number of rows in texture image          (ntex x 1)
   int*      tex_width;            // number of columns in texture image       (ntex x 1)
   int*      tex_nchannel;         // number of channels in texture image      (ntex x 1)
@@ -2030,7 +2042,7 @@ typedef struct mjsLight_ {         // light specification
 
   // intrinsics
   mjtByte active;                  // is light active
-  mjtByte directional;             // is light directional or spot
+  mjtLightType type;               // type of light
   mjtByte castshadow;              // does light cast shadows
   float bulbradius;                // bulb radius, for soft shadows
   float intensity;                 // intensity, in candelas
@@ -2150,6 +2162,7 @@ typedef struct mjsTexture_ {       // texture specification
   mjsElement* element;             // element type
   mjString* name;                  // name
   mjtTexture type;                 // texture type
+  mjtColorSpace colorspace;        // colorspace
 
   // method 1: builtin
   int builtin;                     // builtin type (mjtBuiltin)
@@ -2833,6 +2846,7 @@ typedef struct mjvGeom_ mjvGeom;
 struct mjvLight_ {                // OpenGL light
   float    pos[3];                // position rel. to body frame
   float    dir[3];                // direction rel. to body frame
+  int      type;                  // type (mjtLightType)
   float    attenuation[3];        // OpenGL attenuation (quadratic model)
   float    cutoff;                // OpenGL cutoff
   float    exponent;              // OpenGL exponent
@@ -2840,7 +2854,6 @@ struct mjvLight_ {                // OpenGL light
   float    diffuse[3];            // diffuse rgb (alpha=1)
   float    specular[3];           // specular rgb (alpha=1)
   mjtByte  headlight;             // headlight
-  mjtByte  directional;           // directional light
   mjtByte  castshadow;            // does light cast shadows
   float    bulbradius;            // bulb radius for soft shadows
   float    intensity;             // intensity, in candelas
@@ -2965,290 +2978,6 @@ struct mjvFigure_ {               // abstract 2D figure passed to OpenGL rendere
   float   yaxisdata[2];           // range of y-axis in data units
 };
 typedef struct mjvFigure_ mjvFigure;
-struct mjvSceneState_ {
-  int nbuffer;                     // size of the buffer in bytes
-  void* buffer;                    // heap-allocated memory for all arrays in this struct
-  int maxgeom;                     // maximum number of mjvGeom supported by this state object
-  mjvScene scratch;                // scratch space for vis geoms inserted by the user and plugins
-
-  // fields in mjModel that are necessary to re-render a scene
-  struct {
-    int nv;
-    int nu;
-    int na;
-    int nbody;
-    int nbvh;
-    int nbvhstatic;
-    int njnt;
-    int ngeom;
-    int nsite;
-    int ncam;
-    int nlight;
-    int nmesh;
-    int nskin;
-    int nflex;
-    int nflexvert;
-    int nflextexcoord;
-    int nskinvert;
-    int nskinface;
-    int nskinbone;
-    int nskinbonevert;
-    int nmat;
-    int neq;
-    int ntendon;
-    int ntree;
-    int nwrap;
-    int nsensor;
-    int nnames;
-    int npaths;
-    int nsensordata;
-    int narena;
-
-    mjOption opt;
-    mjVisual vis;
-    mjStatistic stat;
-
-    int* body_parentid;
-    int* body_rootid;
-    int* body_weldid;
-    int* body_mocapid;
-    int* body_jntnum;
-    int* body_jntadr;
-    int* body_dofnum;
-    int* body_dofadr;
-    int* body_geomnum;
-    int* body_geomadr;
-    mjtNum* body_iquat;
-    mjtNum* body_mass;
-    mjtNum* body_inertia;
-    int* body_bvhadr;
-    int* body_bvhnum;
-
-    int* bvh_depth;
-    int* bvh_child;
-    int* bvh_nodeid;
-    mjtNum* bvh_aabb;
-
-    int* jnt_type;
-    int* jnt_bodyid;
-    int* jnt_group;
-
-    int* geom_type;
-    int* geom_bodyid;
-    int* geom_contype;
-    int* geom_conaffinity;
-    int* geom_dataid;
-    int* geom_matid;
-    int* geom_group;
-    mjtNum* geom_size;
-    mjtNum* geom_aabb;
-    mjtNum* geom_rbound;
-    float* geom_rgba;
-
-    int* site_type;
-    int* site_bodyid;
-    int* site_matid;
-    int* site_group;
-    mjtNum* site_size;
-    float* site_rgba;
-
-    int* cam_orthographic;
-    mjtNum* cam_fovy;
-    mjtNum* cam_ipd;
-    int* cam_resolution;
-    float* cam_sensorsize;
-    float* cam_intrinsic;
-
-    mjtByte* light_directional;
-    mjtByte* light_castshadow;
-    float* light_bulbradius;
-    float* light_intensity;
-    float* light_range;
-    mjtByte* light_active;
-    float* light_attenuation;
-    float* light_cutoff;
-    float* light_exponent;
-    float* light_ambient;
-    float* light_diffuse;
-    float* light_specular;
-
-    mjtByte* flex_flatskin;
-    int* flex_dim;
-    int* flex_matid;
-    int* flex_group;
-    int* flex_interp;
-    int* flex_nodeadr;
-    int* flex_nodenum;
-    int* flex_nodebodyid;
-    int* flex_vertadr;
-    int* flex_vertnum;
-    int* flex_elem;
-    int* flex_elemtexcoord;
-    int* flex_elemlayer;
-    int* flex_elemadr;
-    int* flex_elemnum;
-    int* flex_elemdataadr;
-    int* flex_shell;
-    int* flex_shellnum;
-    int* flex_shelldataadr;
-    int* flex_texcoordadr;
-    int* flex_bvhadr;
-    int* flex_bvhnum;
-    mjtByte* flex_centered;
-    mjtNum* flex_node;
-    mjtNum* flex_radius;
-    float* flex_rgba;
-    float* flex_texcoord;
-
-    int* hfield_pathadr;
-
-    int* mesh_bvhadr;
-    int* mesh_bvhnum;
-    int* mesh_texcoordadr;
-    int* mesh_graphadr;
-    int* mesh_pathadr;
-
-    int* skin_matid;
-    int* skin_group;
-    float* skin_rgba;
-    float* skin_inflate;
-    int* skin_vertadr;
-    int* skin_vertnum;
-    int* skin_texcoordadr;
-    int* skin_faceadr;
-    int* skin_facenum;
-    int* skin_boneadr;
-    int* skin_bonenum;
-    float* skin_vert;
-    int* skin_face;
-    int* skin_bonevertadr;
-    int* skin_bonevertnum;
-    float* skin_bonebindpos;
-    float* skin_bonebindquat;
-    int* skin_bonebodyid;
-    int* skin_bonevertid;
-    float* skin_bonevertweight;
-    int* skin_pathadr;
-
-    int* tex_pathadr;
-
-    int* mat_texid;
-    mjtByte* mat_texuniform;
-    float* mat_texrepeat;
-    float* mat_emission;
-    float* mat_specular;
-    float* mat_shininess;
-    float* mat_reflectance;
-    float* mat_metallic;
-    float* mat_roughness;
-    float* mat_rgba;
-
-    int* eq_type;
-    int* eq_obj1id;
-    int* eq_obj2id;
-    int* eq_objtype;
-    mjtNum* eq_data;
-
-    int* tendon_num;
-    int* tendon_matid;
-    int* tendon_group;
-    mjtByte* tendon_limited;
-    mjtByte* tendon_actfrclimited;
-    mjtNum* tendon_width;
-    mjtNum* tendon_range;
-    mjtNum* tendon_actfrcrange;
-    mjtNum* tendon_stiffness;
-    mjtNum* tendon_damping;
-    mjtNum* tendon_frictionloss;
-    mjtNum* tendon_lengthspring;
-    float* tendon_rgba;
-
-    int* actuator_trntype;
-    int* actuator_dyntype;
-    int* actuator_trnid;
-    int* actuator_actadr;
-    int* actuator_actnum;
-    int* actuator_group;
-    mjtByte* actuator_ctrllimited;
-    mjtByte* actuator_actlimited;
-    mjtNum* actuator_ctrlrange;
-    mjtNum* actuator_actrange;
-    mjtNum* actuator_cranklength;
-
-    int* sensor_type;
-    int* sensor_objid;
-    int* sensor_adr;
-
-    int* name_bodyadr;
-    int* name_jntadr;
-    int* name_geomadr;
-    int* name_siteadr;
-    int* name_camadr;
-    int* name_lightadr;
-    int* name_eqadr;
-    int* name_tendonadr;
-    int* name_actuatoradr;
-    char* names;
-    char* paths;
-  } model;
-
-  // fields in mjData that are necessary to re-render a scene
-  struct {
-    mjWarningStat warning[mjNWARNING];
-
-    int nefc;
-    int ncon;
-    int nisland;
-
-    mjtNum time;
-
-    mjtNum* act;
-
-    mjtNum* ctrl;
-    mjtNum* xfrc_applied;
-    mjtByte* eq_active;
-
-    mjtNum* sensordata;
-
-    mjtNum* xpos;
-    mjtNum* xquat;
-    mjtNum* xmat;
-    mjtNum* xipos;
-    mjtNum* ximat;
-    mjtNum* xanchor;
-    mjtNum* xaxis;
-    mjtNum* geom_xpos;
-    mjtNum* geom_xmat;
-    mjtNum* site_xpos;
-    mjtNum* site_xmat;
-    mjtNum* cam_xpos;
-    mjtNum* cam_xmat;
-    mjtNum* light_xpos;
-    mjtNum* light_xdir;
-
-    mjtNum* subtree_com;
-
-    int* ten_wrapadr;
-    int* ten_wrapnum;
-    int* wrap_obj;
-    mjtNum* ten_length;
-    mjtNum* wrap_xpos;
-
-    mjtNum* bvh_aabb_dyn;
-    mjtByte* bvh_active;
-    int* island_dofadr;
-    int* dof_island;
-    int* efc_island;
-    int* tendon_efcadr;
-
-    mjtNum* flexvert_xpos;
-
-    mjContact* contact;
-    mjtNum* efc_force;
-    void* arena;
-  } data;
-};
-typedef struct mjvSceneState_ mjvSceneState;
 
 //----------------------------- MJAPI FUNCTIONS --------------------------------
 void mj_defaultVFS(mjVFS* vfs);
@@ -3283,6 +3012,7 @@ void mj_deleteModel(mjModel* m);
 int mj_sizeModel(const mjModel* m);
 mjData* mj_makeData(const mjModel* m);
 mjData* mj_copyData(mjData* dest, const mjModel* m, const mjData* src);
+mjData* mjv_copyData(mjData* dest, const mjModel* m, const mjData* src);
 void mj_resetData(const mjModel* m, mjData* d);
 void mj_resetDataDebug(const mjModel* m, mjData* d, unsigned char debug_value);
 void mj_resetDataKeyframe(const mjModel* m, mjData* d, int key);
@@ -3436,14 +3166,8 @@ mjtNum mjv_frustumHeight(const mjvScene* scn);
 void mjv_alignToCamera(mjtNum res[3], const mjtNum vec[3], const mjtNum forward[3]);
 void mjv_moveCamera(const mjModel* m, int action, mjtNum reldx, mjtNum reldy,
                     const mjvScene* scn, mjvCamera* cam);
-void mjv_moveCameraFromState(const mjvSceneState* scnstate, int action,
-                             mjtNum reldx, mjtNum reldy,
-                             const mjvScene* scn, mjvCamera* cam);
 void mjv_movePerturb(const mjModel* m, const mjData* d, int action, mjtNum reldx,
                      mjtNum reldy, const mjvScene* scn, mjvPerturb* pert);
-void mjv_movePerturbFromState(const mjvSceneState* scnstate, int action,
-                              mjtNum reldx, mjtNum reldy,
-                              const mjvScene* scn, mjvPerturb* pert);
 void mjv_moveModel(const mjModel* m, int action, mjtNum reldx, mjtNum reldy,
                    const mjtNum roomup[3], mjvScene* scn);
 void mjv_initPerturb(const mjModel* m, mjData* d, const mjvScene* scn, mjvPerturb* pert);
@@ -3466,16 +3190,7 @@ void mjv_makeScene(const mjModel* m, mjvScene* scn, int maxgeom);
 void mjv_freeScene(mjvScene* scn);
 void mjv_updateScene(const mjModel* m, mjData* d, const mjvOption* opt,
                      const mjvPerturb* pert, mjvCamera* cam, int catmask, mjvScene* scn);
-int mjv_updateSceneFromState(const mjvSceneState* scnstate, const mjvOption* opt,
-                             const mjvPerturb* pert, mjvCamera* cam, int catmask,
-                             mjvScene* scn);
 void mjv_copyModel(mjModel* dest, const mjModel* src);
-void mjv_defaultSceneState(mjvSceneState* scnstate);
-void mjv_makeSceneState(const mjModel* m, const mjData* d,
-                        mjvSceneState* scnstate, int maxgeom);
-void mjv_freeSceneState(mjvSceneState* scnstate);
-void mjv_updateSceneState(const mjModel* m, mjData* d, const mjvOption* opt,
-                          mjvSceneState* scnstate);
 void mjv_addGeoms(const mjModel* m, mjData* d, const mjvOption* opt,
                   const mjvPerturb* pert, int catmask, mjvScene* scn);
 void mjv_makeLights(const mjModel* m, const mjData* d, mjvScene* scn);

@@ -167,8 +167,8 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"camera", "?", "17", "orthographic", "fovy", "ipd", "resolution", "pos", "quat",
             "axisangle", "xyaxes", "zaxis", "euler", "mode", "focal", "focalpixel",
             "principal", "principalpixel", "sensorsize", "user"},
-        {"light", "?", "15", "pos", "dir", "bulbradius", "intensity", "range",
-            "directional", "castshadow", "active", "attenuation", "cutoff", "exponent",
+        {"light", "?", "16", "pos", "dir", "bulbradius", "intensity", "range",
+            "directional", "type", "castshadow", "active", "attenuation", "cutoff", "exponent",
             "ambient", "diffuse", "specular", "mode"},
         {"pair", "?", "7", "condim", "friction", "solref", "solreffriction", "solimp",
          "gap", "margin"},
@@ -241,8 +241,8 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"<"},
             {"bone", "*", "5", "body", "bindpos", "bindquat", "vertid", "vertweight"},
         {">"},
-        {"texture", "*", "23", "name", "type", "content_type", "file", "gridsize", "gridlayout",
-            "fileright", "fileleft", "fileup", "filedown", "filefront", "fileback",
+        {"texture", "*", "24", "name", "type", "colorspace", "content_type", "file", "gridsize",
+            "gridlayout", "fileright", "fileleft", "fileup", "filedown", "filefront", "fileback",
             "builtin", "rgb1", "rgb2", "mark", "markrgb", "random", "width", "height",
             "hflip", "vflip", "nchannel"},
         {"material", "*", "12", "name", "class", "texture",  "texrepeat", "texuniform",
@@ -281,7 +281,7 @@ const char* MJCF[nMJCF][mjXATTRNUM] = {
         {"camera", "*", "20", "name", "class", "orthographic", "fovy", "ipd", "resolution", "pos",
             "quat", "axisangle", "xyaxes", "zaxis", "euler", "mode", "target",
             "focal", "focalpixel", "principal", "principalpixel", "sensorsize", "user"},
-        {"light", "*", "18", "name", "class", "directional", "castshadow", "active",
+        {"light", "*", "19", "name", "class", "directional", "type", "castshadow", "active",
             "pos", "dir", "bulbradius", "intensity", "range", "attenuation", "cutoff",
             "exponent", "ambient", "diffuse", "specular", "mode", "target"},
         {"plugin", "*", "2", "plugin", "instance"},
@@ -580,6 +580,17 @@ const mjMap camlight_map[camlight_sz] = {
   {"targetbodycom", mjCAMLIGHT_TARGETBODYCOM}
 };
 
+
+// light type
+const int lighttype_sz = 4;
+const mjMap lighttype_map[lighttype_sz] = {
+  {"spot",          mjLIGHT_SPOT},
+  {"directional",   mjLIGHT_DIRECTIONAL},
+  {"point",         mjLIGHT_POINT},
+  {"image",         mjLIGHT_IMAGE}
+};
+
+
 // texmat role type
 const int texrole_sz = mjNTEXROLE - 1;
 const mjMap texrole_map[texrole_sz] = {
@@ -647,6 +658,15 @@ const mjMap texture_map[texture_sz] = {
   {"2d",          mjTEXTURE_2D},
   {"cube",        mjTEXTURE_CUBE},
   {"skybox",      mjTEXTURE_SKYBOX}
+};
+
+
+// colorspace for texture
+const int colorspace_sz = 3;
+const mjMap colorspace_map[colorspace_sz] = {
+  {"auto",        mjCOLORSPACE_AUTO},
+  {"linear",      mjCOLORSPACE_LINEAR},
+  {"sRGB",        mjCOLORSPACE_SRGB}
 };
 
 
@@ -804,6 +824,15 @@ const mjMap flexself_map[5] = {
   {"bvh",         mjFLEXSELF_BVH},
   {"sap",         mjFLEXSELF_SAP},
   {"auto",        mjFLEXSELF_AUTO},
+};
+
+
+// flex elastic 2d type
+const mjMap elastic2d_map[5] = {
+  {"none",        0},
+  {"bend",        1},
+  {"stretch",     2},
+  {"both",        3},
 };
 
 
@@ -1401,7 +1430,7 @@ void mjXReader::OneFlex(XMLElement* elem, mjsFlex* flex) {
     ReadAttr(elasticity, "poisson", 1, &flex->poisson, text);
     ReadAttr(elasticity, "thickness", 1, &flex->thickness, text);
     ReadAttr(elasticity, "damping", 1, &flex->damping, text);
-    ReadAttr(elasticity, "elastic2d", 1, &flex->elastic2d, text);
+    MapValue(elasticity, "elastic2d", &flex->elastic2d, elastic2d_map, 4);
   }
 
   // write error info
@@ -1834,6 +1863,7 @@ void mjXReader::OneCamera(XMLElement* elem, mjsCamera* camera) {
 // light element parser
 void mjXReader::OneLight(XMLElement* elem, mjsLight* light) {
   int n;
+  bool has_directional = false;
   string text, name, targetbody;
 
   // read attributes
@@ -1847,7 +1877,14 @@ void mjXReader::OneLight(XMLElement* elem, mjsLight* light) {
     light->mode = (mjtCamLight)n;
   }
   if (MapValue(elem, "directional", &n, bool_map, 2)) {
-    light->directional = (n == 1);
+    light->type = (n == 1) ? mjLIGHT_DIRECTIONAL : mjLIGHT_SPOT;
+    has_directional = true;
+  }
+  if (MapValue(elem, "type", &n, lighttype_map, lighttype_sz)) {
+    if (has_directional) {
+      throw mjXError(elem, "type and directional cannot both be defined");
+    }
+    light->type = (mjtLightType)n;
   }
   if (MapValue(elem, "castshadow", &n, bool_map, 2)) {
     light->castshadow = (n == 1);
@@ -2665,7 +2702,7 @@ void mjXReader::OneFlexcomp(XMLElement* elem, mjsBody* body, const mjVFS* vfs) {
     ReadAttr(elasticity, "poisson", 1, &dflex.poisson, text);
     ReadAttr(elasticity, "damping", 1, &dflex.damping, text);
     ReadAttr(elasticity, "thickness", 1, &dflex.thickness, text);
-    ReadAttr(elasticity, "elastic2d", 1, &dflex.elastic2d, text);
+    MapValue(elasticity, "elastic2d", &dflex.elastic2d, elastic2d_map, 4);
   }
 
   // check errors
@@ -3184,6 +3221,9 @@ void mjXReader::Asset(XMLElement* section, const mjVFS* vfs) {
       // read attributes
       if (MapValue(elem, "type", &n, texture_map, texture_sz)) {
         texture->type = (mjtTexture)n;
+      }
+      if (MapValue(elem, "colorspace", &n, colorspace_map, colorspace_sz)) {
+        texture->colorspace = (mjtColorSpace)n;
       }
       if (ReadAttrTxt(elem, "name", texname)) {
         mjs_setString(texture->name, texname.c_str());

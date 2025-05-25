@@ -165,6 +165,17 @@ values are used in ``m->cam_mode`` and ``m->light_mode``.
 .. mujoco-include:: mjtCamLight
 
 
+.. _mjtLightType:
+
+mjtLightType
+~~~~~~~~~~~~
+
+The type of a light source describing how its position, orientation and other properties will interact with the
+objects in the scene. These values are used in ``m->light_type``.
+
+.. mujoco-include:: mjtLightType
+
+
 .. _mjtTexture:
 
 mjtTexture
@@ -985,17 +996,6 @@ mjvScene
 This structure contains everything needed to render the 3D scene in OpenGL.
 
 .. mujoco-include:: mjvScene
-
-
-.. _mjvSceneState:
-
-mjvSceneState
-~~~~~~~~~~~~~
-
-This structure contains the portions of :ref:`mjModel` and :ref:`mjData` that are required for
-various ``mjv_*`` functions.
-
-.. mujoco-include:: mjvSceneState
 
 
 .. _mjvFigure:

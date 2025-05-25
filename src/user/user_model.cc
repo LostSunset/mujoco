@@ -2669,7 +2669,7 @@ void mjCModel::CopyTree(mjModel* m) {
       m->light_bodyid[lid] = pl->body->id;
       m->light_mode[lid] = (int)pl->mode;
       m->light_targetbodyid[lid] = pl->targetbodyid;
-      m->light_directional[lid] = (mjtByte)pl->directional;
+      m->light_type[lid] = pl->type;
       m->light_castshadow[lid] = (mjtByte)pl->castshadow;
       m->light_active[lid] = (mjtByte)pl->active;
       mjuu_copyvec(m->light_pos+3*lid, pl->pos, 3);
@@ -3165,7 +3165,7 @@ void mjCModel::CopyObjects(mjModel* m) {
     for (int k=0; k < pfl->nedge; k++) {
       m->flex_edge[2*(edge_adr+k)] = pfl->edge[k].first;
       m->flex_edge[2*(edge_adr+k)+1] = pfl->edge[k].second;
-      if (pfl->dim == 2) {
+      if (pfl->dim == 2 && (pfl->elastic2d == 1 || pfl->elastic2d == 3)) {
         m->flex_edgeflap[2*(edge_adr+k)+0] = pfl->flaps[k].vertices[2];
         m->flex_edgeflap[2*(edge_adr+k)+1] = pfl->flaps[k].vertices[3];
       } else {
@@ -3285,6 +3285,7 @@ void mjCModel::CopyObjects(mjModel* m) {
 
     // set fields
     m->tex_type[i] = ptex->type;
+    m->tex_colorspace[i] = ptex->colorspace;
     m->tex_height[i] = ptex->height;
     m->tex_width[i] = ptex->width;
     m->tex_nchannel[i] = ptex->nchannel;

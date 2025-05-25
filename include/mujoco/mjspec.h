@@ -394,7 +394,7 @@ typedef struct mjsLight_ {         // light specification
 
   // intrinsics
   mjtByte active;                  // is light active
-  mjtByte directional;             // is light directional or spot
+  mjtLightType type;               // type of light
   mjtByte castshadow;              // does light cast shadows
   float bulbradius;                // bulb radius, for soft shadows
   float intensity;                 // intensity, in candelas
@@ -525,6 +525,7 @@ typedef struct mjsTexture_ {       // texture specification
   mjsElement* element;             // element type
   mjString* name;                  // name
   mjtTexture type;                 // texture type
+  mjtColorSpace colorspace;        // colorspace
 
   // method 1: builtin
   int builtin;                     // builtin type (mjtBuiltin)
