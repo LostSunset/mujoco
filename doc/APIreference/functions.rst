@@ -51,6 +51,15 @@ Compile :ref:`mjSpec` to :ref:`mjModel`. A spec can be edited and compiled multi
 :ref:`mjModel` instance that takes the edits into account.
 If compilation fails, :ref:`mj_compile` returns ``NULL``; the error can be read with :ref:`mjs_getError`.
 
+.. _mj_copyBack:
+
+`mj_copyBack <#mj_copyBack>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mj_copyBack
+
+Copy real-valued arrays from model to spec, returns 1 on success.
+
 .. _mj_recompile:
 
 `mj_recompile <#mj_recompile>`__
@@ -748,8 +757,7 @@ Compare forward and inverse dynamics, save results in fwdinv.
 Sub components
 ^^^^^^^^^^^^^^
 
-These are sub-components of the simulation pipeline, called internally from the components above. It is very unlikely
-that the user will need to call them.
+These are sub-components of the simulation pipeline, called internally from the components above.
 
 .. _mj_sensorPos:
 
@@ -885,6 +893,18 @@ Compute actuator transmission lengths and moments.
 .. mujoco-include:: mj_crb
 
 Run composite rigid body inertia algorithm (CRB).
+
+.. _mj_makeM:
+
+`mj_makeM <#mj_makeM>`__
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mj_makeM
+
+Compute the composite rigid body inertia with :ref:`mj_crb`, add terms due
+to :ref:`tendon armature<tendon-spatial-armature>`. The joint-space inertia matrix is stored in both ``mjData.qM`` and
+``mjData.M``. These arrays represent the same quantity using different layouts (parent-based and compressed sparse row,
+respectively).
 
 .. _mj_factorM:
 

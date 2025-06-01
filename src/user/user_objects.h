@@ -462,6 +462,10 @@ class mjCBody : public mjCBody_, private mjsBody {
   // getters
   std::vector<mjCBody*> Bodies() const { return bodies; }
 
+  // accumulate inertia of another body into this body, if `result` is not nullptr, the accumulated
+  // inertia will be stored in `result`, otherwise the body's private spec will be used.
+  void AccumulateInertia(const mjsBody* other, mjsBody* result = nullptr);
+
  private:
   mjCBody(const mjCBody& other, mjCModel* _model);  // copy constructor
   mjCBody& operator=(const mjCBody& other);         // copy assignment
@@ -793,6 +797,9 @@ class mjCLight_ : public mjCBase {
  protected:
   mjCBody* body;                  // light's body
   int targetbodyid;               // id of target body; -1: none
+  int texid;                      // id of texture; -1: none
+  std::string texture_;
+  std::string spec_texture_;
   std::string targetbody_;
   std::string spec_targetbody_;
 };
@@ -814,6 +821,7 @@ class mjCLight : public mjCLight_, private mjsLight {
 
   // used by mjXWriter and mjCModel
   const std::string& get_targetbody() const { return targetbody_; }
+  const std::string& get_texture() const { return texture_; }
 
   void SetParent(mjCBody* _body) { body = _body; }
   mjCBody* GetParent() const { return body; }
