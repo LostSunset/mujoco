@@ -41,24 +41,6 @@ using mujoco::user::StringToVector;
 static constexpr std::size_t kGlobalCacheSize = 500 * (1 << 20);
 
 
-// prepend prefix
-template <typename T>
-static T& operator+(std::string_view prefix, T& base) {
-  base.prefix = std::string(prefix);
-  return base;
-}
-
-
-
-// append suffix
-template <typename T>
-static T& operator+(T& base, std::string_view suffix) {
-  base.suffix = std::string(suffix);
-  return base;
-}
-
-
-
 // create model
 mjSpec* mj_makeSpec() {
   mjCModel* modelC = new mjCModel;
@@ -135,8 +117,11 @@ static void SetFrame(mjsBody* body, mjtObj objtype, mjsFrame* frame) {
 // attach body to a frame of the parent
 static mjsElement* attachBody(mjCFrame* parent, const mjCBody* child,
                               const char* prefix, const char* suffix) {
+  mjCBody* mutable_child = const_cast<mjCBody*>(child);
+  mutable_child->prefix = prefix;
+  mutable_child->suffix = suffix;
   try {
-    *parent += std::string(prefix) + *(mjCBody*)child + std::string(suffix);
+    *parent += *mutable_child;
   } catch (mjCError& e) {
     parent->model->SetError(e);
     return nullptr;
@@ -151,8 +136,11 @@ static mjsElement* attachBody(mjCFrame* parent, const mjCBody* child,
 // attach frame to a parent body
 static mjsElement* attachFrame(mjCBody* parent, const mjCFrame* child,
                                const char* prefix, const char* suffix) {
+  mjCFrame* mutable_child = const_cast<mjCFrame*>(child);
+  mutable_child->prefix = prefix;
+  mutable_child->suffix = suffix;
   try {
-    *parent += std::string(prefix) + *(mjCFrame*)child + std::string(suffix);
+    *parent += *mutable_child;
   } catch (mjCError& e) {
     parent->model->SetError(e);
     return nullptr;
@@ -295,37 +283,6 @@ const char* mjs_getError(mjSpec* s) {
 
 
 
-// detach body from mjSpec, return 0 on success
-int mjs_detachBody(mjSpec* s, mjsBody* b) {
-  mjCModel* model = static_cast<mjCModel*>(s->element);
-  mjCBody* body = static_cast<mjCBody*>(b->element);
-  try {
-    *model -= *body;
-  } catch (mjCError& e) {
-    model->SetError(e);
-    return -1;
-  }
-  model->Detach(body);
-  return 0;
-}
-
-// detach default from mjSpec, return 0 on success
-int mjs_detachDefault(mjSpec* s, mjsDefault* def) {
-  mjCModel* modelC = static_cast<mjCModel*>(s->element);
-  if (!def) {
-    modelC->SetError(mjCError(0, "Cannot detach, default is null"));
-    return -1;
-  }
-  mjCDef* defC = static_cast<mjCDef*>(def->element);
-  try {
-    *modelC -= *defC;
-  } catch (mjCError& e) {
-    modelC->SetError(e);
-    return -1;
-  }
-  return 0;
-}
-
 // check if model has warnings
 int mjs_isWarning(mjSpec* s) {
   mjCModel* modelC = static_cast<mjCModel*>(s->element);
@@ -383,16 +340,43 @@ int mj_copyBack(mjSpec* s, const mjModel* m) {
 
 
 
-// delete object, return 0 on success
-int mjs_delete(mjsElement* element) {
-  mjCModel* model;
-  if (element->elemtype == mjOBJ_DEFAULT)
-    model = static_cast<mjCDef*>(element)->model;
-  else
-    model = static_cast<mjCBase*>(element)->model;
+// detach body from mjSpec, return 0 on success
+int mjs_detach(mjSpec* s, mjsElement* element) {
+  mjCModel* model = static_cast<mjCModel*>(s->element);
+  if (!element) {
+    model->SetError(mjCError(0, "Element is null."));
+    return -1;
+  }
   try {
-    // it will call the appropriate destructor since ~mjCBase is virtual
-    model->DeleteElement(element);
+    if (element->elemtype == mjOBJ_DEFAULT) {
+      throw mjCError(0, "Detach is not implemented for defaults.");
+    } else {
+      *model -= element;
+    }
+    return 0;
+  } catch (mjCError& e) {
+    model->SetError(e);
+    return -1;
+  }
+}
+
+
+
+// delete object, return 0 on success
+int mjs_delete(mjSpec* s, mjsElement* element) {
+  mjCModel* model = static_cast<mjCModel*>(s->element);
+  if (!element) {
+    model->SetError(mjCError(0, "Element is null."));
+    return -1;
+  }
+  try {
+    if (element->elemtype == mjOBJ_DEFAULT) {
+      mjCDef* def = static_cast<mjCDef*>(element);
+      *model -= *def;
+    } else {
+      mjs_detach(s, element);
+      model->DeleteElement(element);
+    }
     return 0;
   } catch (mjCError& e) {
     model->SetError(e);
@@ -948,6 +932,8 @@ mjsElement* mjs_findElement(mjSpec* s, mjtObj type, const char* name) {
     case mjOBJ_LIGHT:
     case mjOBJ_FRAME:
       return model->FindTree(model->GetWorld(), type, std::string(name));  // recursive search
+    case mjOBJ_TEXTURE:
+      return model->FindTexture(std::string(name));  // check filename too
     default:
       return model->FindObject(type, std::string(name));  // always available
   }
@@ -1045,7 +1031,7 @@ const char* mjs_resolveOrientation(double quat[4], mjtByte degree, const char* s
 mjsFrame* mjs_bodyToFrame(mjsBody** body) {
   mjCBody* bodyC = static_cast<mjCBody*>((*body)->element);
   mjCFrame* frameC = bodyC->ToFrame();
-  bodyC->model->Detach(bodyC);
+  bodyC->model->DeleteElement((*body)->element);
   *body = nullptr;
   return &frameC->spec;
 }

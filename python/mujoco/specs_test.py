@@ -604,7 +604,7 @@ class SpecsTest(absltest.TestCase):
 
     # test delete default
     def1 = spec.find_default('def1')
-    spec.detach_default(def1)
+    spec.delete(def1)
     def1 = spec.find_default('def1')
     self.assertIsNone(def1)
 
@@ -838,9 +838,9 @@ class SpecsTest(absltest.TestCase):
     self.assertIsNotNone(site)
     self.assertEqual(site, spec.site('head'))
 
-    site.delete()
-    spec.sensors[-1].delete()
-    spec.sensors[-1].delete()
+    spec.delete(site)
+    spec.delete(spec.sensors[-1])
+    spec.delete(spec.sensors[-1])
 
     model = spec.compile()
     self.assertIsNotNone(model)
@@ -861,7 +861,7 @@ class SpecsTest(absltest.TestCase):
 
     body = spec.worldbody.add_body()
     body.plugin = plugin
-    body.plugin.plugin_name = 'mujoco.elasticity.cable'
+    body.plugin.name = 'instance_name'
     body.plugin.active = True
 
     geom = body.add_geom()
@@ -930,7 +930,7 @@ class SpecsTest(absltest.TestCase):
     """)
     plugin = spec.plugins[0]
     self.assertIsNotNone(plugin)
-    plugin.delete()
+    spec.delete(plugin)
 
     model = spec.compile()
     self.assertIsNotNone(model)
@@ -1000,6 +1000,14 @@ class SpecsTest(absltest.TestCase):
     texture = spec.add_texture(name='texture', height=2, width=2)
     texture.data = np.zeros((2, 2, 3), dtype=np.uint8).tobytes()
     spec.compile()
+
+  def test_find_unnamed_texture(self):
+    spec = mujoco.MjSpec()
+    texture_file = spec.add_texture(file='file.png')
+    texture_name = spec.add_texture(name='name')
+    self.assertEqual(spec.texture('file'), texture_file)
+    self.assertEqual(spec.texture('name'), texture_name)
+    self.assertIsNone(spec.texture('none'))
 
   def test_attach_units(self):
     child = mujoco.MjSpec()

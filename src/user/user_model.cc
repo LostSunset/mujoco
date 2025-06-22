@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <filesystem>  // NOLINT(build/c++17)
 #include <functional>
 #include <mutex>
 #include <string>
@@ -653,7 +654,7 @@ mjCModel& mjCModel::operator-=(const mjCBody& subtree) {
 
 
 // add default tree to this model
-mjCModel_& mjCModel::operator+=(mjCDef& subtree) {
+mjCModel& mjCModel::operator+=(mjCDef& subtree) {
   defaults_.push_back(&subtree);
   def_map[subtree.name] = &subtree;
   subtree.model = this;
@@ -732,7 +733,6 @@ void deletefromlist(std::vector<T*>* list, mjsElement* element) {
   for (int j = 0; j < list->size(); ++j) {
     list->at(j)->id = -1;
     if (list->at(j) == element) {
-      list->at(j)->Release();
       list->erase(list->begin() + j);
       j--;
     }
@@ -741,15 +741,54 @@ void deletefromlist(std::vector<T*>* list, mjsElement* element) {
 
 
 
-// discard all invalid elements from all lists
+// recursively delete all plugins in the subtree
+void mjCModel::DeleteSubtreePlugin(mjCBody* subtree) {
+  mjsPlugin* plugin = &(subtree->spec.plugin);
+  if (plugin->active && plugin->name->empty()) {
+    *this -= plugin->element;
+    detached_.push_back(static_cast<mjCBase*>(plugin->element));
+  }
+  for (auto* body : subtree->Bodies()) {
+    DeleteSubtreePlugin(body);
+  }
+}
+
+
+
+// delete an object from the model
 void mjCModel::DeleteElement(mjsElement* el) {
+  static_cast<mjCBase*>(el)->Release();
+}
+
+
+
+// remove the element from the model
+void mjCModel::operator-=(mjsElement* el) {
+  if (el->elemtype == mjOBJ_BODY) {
+    mjCBody* body = static_cast<mjCBody*>(el);
+    *this -= *body;
+  }
+
   ResetTreeLists();
+
+  if (el->elemtype != mjOBJ_DEFAULT) {
+    if (static_cast<mjCBase*>(el)->model != this) {
+      throw mjCError(nullptr, "element is not in this model");
+    }
+  } else {
+    if (static_cast<mjCDef*>(el)->model != this) {
+      throw mjCError(nullptr, "default is not in this model");
+    }
+  }
 
   switch (el->elemtype) {
     case mjOBJ_BODY:
+    {
       MakeTreeLists();  // rebuild lists that were reset at the beginning of the function
-      throw mjCError(nullptr, "bodies cannot be deleted, use detach instead");
+      mjCBody* subtree = static_cast<mjCBody*>(el);
+      DeleteSubtreePlugin(subtree);
       break;
+    }
 
     case mjOBJ_DEFAULT:
       MakeTreeLists();  // rebuild lists that were reset at the beginning of the function
@@ -759,8 +798,9 @@ void mjCModel::DeleteElement(mjsElement* el) {
     case mjOBJ_GEOM:
     {
       mjCGeom* geom = static_cast<mjCGeom*>(el);
-      if (geom->plugin.active && geom->plugin.name->empty() && geom->GetRef() == 1) {
-        DeleteElement(geom->plugin.element);
+      if (geom->plugin.active && geom->plugin.name->empty()) {
+        *this -= geom->plugin.element;
+        detached_.push_back(static_cast<mjCBase*>(geom->plugin.element));
       }
       deletefromlist(&(geom->body->geoms), el);
       break;
@@ -785,8 +825,9 @@ void mjCModel::DeleteElement(mjsElement* el) {
     case mjOBJ_MESH:
     {
       mjCMesh* mesh = static_cast<mjCMesh*>(el);
-      if (mesh->plugin.active && mesh->plugin.name->empty() && mesh->GetRef() == 1) {
-        DeleteElement(mesh->plugin.element);
+      if (mesh->plugin.active && mesh->plugin.name->empty()) {
+        *this -= mesh->plugin.element;
+        detached_.push_back(static_cast<mjCBase*>(mesh->plugin.element));
       }
       deletefromlist(object_lists_[mjOBJ_MESH], el);
       break;
@@ -795,8 +836,9 @@ void mjCModel::DeleteElement(mjsElement* el) {
     case mjOBJ_ACTUATOR:
     {
       mjCActuator* actuator = static_cast<mjCActuator*>(el);
-      if (actuator->plugin.active && actuator->plugin.name->empty() && actuator->GetRef() == 1) {
-        DeleteElement(actuator->plugin.element);
+      if (actuator->plugin.active && actuator->plugin.name->empty()) {
+        *this -= actuator->plugin.element;
+        detached_.push_back(static_cast<mjCBase*>(actuator->plugin.element));
       }
       deletefromlist(object_lists_[mjOBJ_ACTUATOR], el);
       break;
@@ -805,8 +847,9 @@ void mjCModel::DeleteElement(mjsElement* el) {
     case mjOBJ_SENSOR:
     {
       mjCSensor* sensor = static_cast<mjCSensor*>(el);
-      if (sensor->plugin.active && sensor->plugin.name->empty() && sensor->GetRef() == 1) {
-        DeleteElement(sensor->plugin.element);
+      if (sensor->plugin.active && sensor->plugin.name->empty()) {
+        *this -= sensor->plugin.element;
+        detached_.push_back(static_cast<mjCBase*>(sensor->plugin.element));
       }
       deletefromlist(object_lists_[mjOBJ_SENSOR], el);
       break;
@@ -823,29 +866,6 @@ void mjCModel::DeleteElement(mjsElement* el) {
 
   // update signature after we updated everything
   spec.element->signature = Signature();
-}
-
-
-
-// recursively delete all plugins in the subtree
-void deletesubtreeplugin(mjCBody* subtree, mjCModel* model) {
-  mjsPlugin* plugin = &(subtree->spec.plugin);
-  if (plugin->active && plugin->name->empty()) {
-    model->DeleteElement(plugin->element);
-  }
-  for (auto* body : subtree->Bodies()) {
-    deletesubtreeplugin(body, model);
-  }
-}
-
-
-
-// deletes all plugins in the subtree and then the subtree itself
-void mjCModel::Detach(mjCBody* subtree) {
-  if (subtree->GetRef() == 1)  {
-    deletesubtreeplugin(subtree, this);
-  }
-  subtree->Release();
 }
 
 
@@ -939,6 +959,7 @@ mjCModel::~mjCModel() {
   for (int i=0; i < defaults_.size(); i++) delete defaults_[i];
   for (int i=0; i < specs_.size(); i++) mj_deleteSpec(specs_[i]);
   for (int i=0; i < plugins_.size(); i++) plugins_[i]->Release();
+  for (int i=0; i < detached_.size(); i++) detached_[i]->Release();
 
   // clear sizes and pointer lists created in Compile
   Clear();
@@ -1368,6 +1389,23 @@ static T* findobject(std::string_view name, const vector<T*>& list, const mjKeyM
   }
   return list[id->second];
 }
+
+
+
+mjCBase* mjCModel::FindTexture(std::string_view name) const {
+  for (unsigned int i=0; i < textures_.size(); i++) {
+    if (textures_[i]->name == name) {
+      return textures_[i];
+    }
+    if (textures_[i]->name.empty() &&
+        std::filesystem::path(textures_[i]->spec_file_).filename().stem() == name) {
+      return textures_[i];
+    }
+  }
+  return nullptr;
+}
+
+
 
 // find object in global lists given string type and name
 mjCBase* mjCModel::FindObject(mjtObj type, string name) const {

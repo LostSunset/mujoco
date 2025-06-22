@@ -183,6 +183,7 @@ static void setf4(float* rgba, float r, float g, float b, float a) {
 // set visual options to default values
 void mj_defaultVisual(mjVisual* vis) {
   // global
+  vis->global.cameraid            = -1;
   vis->global.orthographic        = 0;
   vis->global.fovy                = 45;
   vis->global.ipd                 = 0.068;
@@ -1988,6 +1989,9 @@ static void _resetData(const mjModel* m, mjData* d, unsigned char debug_value) {
   mju_zero(d->sensordata, m->nsensordata);
   mju_zero(d->mocap_pos, 3*m->nmocap);
   mju_zero(d->mocap_quat, 4*m->nmocap);
+
+  // zero out qM, special case because scattring from M skips simple body off-diagonals
+  mju_zero(d->qM, m->nM);
 
   // copy qpos0 from model
   if (m->qpos0) {
