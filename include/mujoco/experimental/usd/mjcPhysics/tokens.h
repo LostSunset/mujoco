@@ -26,10 +26,10 @@
 
 #include <vector>
 
-#include "./api.h"
-#include "pxr/base/tf/staticData.h"
-#include "pxr/base/tf/token.h"
-#include "pxr/pxr.h"
+#include <mujoco/experimental/usd/mjcPhysics/api.h>
+#include <pxr/base/tf/staticData.h>
+#include <pxr/base/tf/token.h>
+#include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

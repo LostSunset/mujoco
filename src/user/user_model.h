@@ -229,9 +229,6 @@ class mjCModel : public mjCModel_, private mjSpec {
   // delete object from the corresponding list
   void operator-=(mjsElement* el);
 
-  // delete object
-  void DeleteElement(mjsElement* el);
-
   // delete default and all descendants
   void RemoveDefault(mjCDef* def);
 
@@ -427,9 +424,6 @@ class mjCModel : public mjCModel_, private mjSpec {
 
   // compute qpos0
   void ComputeReference();
-
-  // return true if all bodies have valid mass and inertia
-  bool CheckBodiesMassInertia(std::vector<mjCBody*> bodies);
 
   // return true if body has valid mass and inertia
   bool CheckBodyMassInertia(mjCBody* body);

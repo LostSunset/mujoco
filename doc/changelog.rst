@@ -8,14 +8,15 @@ Upcoming version (not yet released)
 .. admonition:: Breaking API changes
    :class: attention
 
-   - The functions ``mjs_detachBody`` and ``mjs_detachDefault`` have been replaced by :ref:`mjs_delete`. Additionally,
-     `:ref:mjs_detach` was added in order to remove an element from the spec without deleting it.
+   - The functions ``mjs_detachBody`` and ``mjs_detachDefault`` have been replaced by :ref:`mjs_delete`.
    - The Python functions ``element.delete`` have been replaced by ``spec.delete(element)``.
 
 General
 ^^^^^^^
 - Added support for setting the initial camera in the viewer using
   :ref:`visual/global/cameraid<visual-global-cameraid>`.
+- Added support to only sync the state in the Python :ref:`passive viewer<PyViewerPassive>`'s ``Sync`` method, this is
+  useful to improve performance. The default behavior is unchanged and copies the entire model and data.
 
 Bug fixes
 ^^^^^^^^^
