@@ -116,50 +116,6 @@ bool IsNullPose(const T pos[3], const T quat[4]) {
   return IsSamePose(pos, zero, quat, qunit);
 }
 
-
-// set ids, check for repeated names
-template <class T>
-static void processlist(mjListKeyMap& ids, vector<T*>& list,
-                        mjtObj type, bool checkrepeat = true) {
-  // assign ids for regular elements
-  if (type < mjNOBJECT) {
-    for (size_t i=0; i < list.size(); i++) {
-      // check for incompatible id setting; SHOULD NOT OCCUR
-      if (list[i]->id != -1 && list[i]->id != i) {
-        throw mjCError(list[i], "incompatible id in %s array, position %d", mju_type2Str(type), i);
-      }
-
-      // id equals position in array
-      list[i]->id = i;
-
-      // add to ids map
-      ids[type][list[i]->name] = i;
-    }
-  }
-
-  // check for repeated names
-  if (checkrepeat) {
-    // created vectors with all names
-    vector<string> allnames;
-    for (size_t i=0; i < list.size(); i++) {
-      if (!list[i]->name.empty()) {
-        allnames.push_back(list[i]->name);
-      }
-    }
-
-    // sort and check for duplicates
-    if (allnames.size() > 1) {
-      std::sort(allnames.begin(), allnames.end());
-      auto adjacent = std::adjacent_find(allnames.begin(), allnames.end());
-      if (adjacent != allnames.end()) {
-        string msg = "repeated name '" + *adjacent + "' in " + mju_type2Str(type);
-        throw mjCError(nullptr, "%s", msg.c_str());
-      }
-    }
-  }
-}
-
-
 }  // namespace
 
 //---------------------------------- CONSTRUCTOR AND DESTRUCTOR ------------------------------------
@@ -308,7 +264,7 @@ void mjCModel::CopyList(std::vector<T*>& dest,
     dest.back()->CopyPlugin();
   }
   if (!dest.empty()) {
-    processlist(ids, dest, dest[0]->elemtype);
+    ProcessList_(ids, dest, dest[0]->elemtype);
   }
 }
 
@@ -548,7 +504,7 @@ void mjCModel::RemoveFromList(std::vector<T*>& list, const mjCModel& other) {
   }
   if (removed > 0 && !list.empty()) {
     // if any elements were removed, update ids using processlist
-    processlist(ids, list, list[0]->elemtype, /*checkrepeat=*/false);
+    ProcessList_(ids, list, list[0]->elemtype, /*checkrepeat=*/false);
   }
 }
 
@@ -604,7 +560,7 @@ void mjCModel::RemovePlugins() {
 
   // if any elements were removed, update ids using processlist
   if (removed > 0 && !plugins_.empty()) {
-    processlist(ids, plugins_, plugins_[0]->elemtype, /*checkrepeat=*/false);
+    ProcessList_(ids, plugins_, plugins_[0]->elemtype, /*checkrepeat=*/false);
   }
 }
 
@@ -963,6 +919,7 @@ void mjCModel::Clear() {
   nbvh = 0;
   nbvhstatic = 0;
   nbvhdynamic = 0;
+  noct = 0;
   njnt = 0;
   ngeom = 0;
   nsite = 0;
@@ -1726,6 +1683,7 @@ void mjCModel::IndexAssets(bool discard) {
           ((mjCMesh*)mesh)->SetNotVisual();  // reset to true by mesh->Compile()
         }
         geom->mesh = (discard && geom->visual_) ? nullptr : (mjCMesh*)mesh;
+        static_cast<mjCMesh*>(mesh)->needoct_ |= geom->spec.type == mjGEOM_SDF;
       } else {
         throw mjCError(geom, "mesh '%s' not found in geom %d", geom->get_meshname().c_str(), i);
       }
@@ -1936,6 +1894,7 @@ void mjCModel::SetSizes() {
   }
   for (int i=0; i < nmesh; i++) {
     nbvhstatic += meshes_[i]->tree().Nbvh();
+    noct += meshes_[i]->octree().NumNodes();
   }
   for (int i=0; i < nflex; i++) {
     nbvhdynamic += flexes_[i]->tree.Nbvh();
@@ -2943,7 +2902,7 @@ int mjCModel::CountNJmom(const mjModel* m) {
 
 // copy objects outside kinematic tree
 void mjCModel::CopyObjects(mjModel* m) {
-  int adr, bone_adr, vert_adr, node_adr, normal_adr, face_adr, texcoord_adr;
+  int adr, bone_adr, vert_adr, node_adr, normal_adr, face_adr, texcoord_adr, oct_adr;
   int edge_adr, elem_adr, elemdata_adr, elemedge_adr, shelldata_adr, evpair_adr;
   int bonevert_adr, graph_adr, data_adr, bvh_adr;
   int poly_adr, polymap_adr, polyvert_adr;
@@ -2963,6 +2922,7 @@ void mjCModel::CopyObjects(mjModel* m) {
   }
 
   // meshes
+  oct_adr = 0;
   vert_adr = 0;
   normal_adr = 0;
   texcoord_adr = 0;
@@ -2989,6 +2949,8 @@ void mjCModel::CopyObjects(mjModel* m) {
     m->mesh_graphadr[i] = (pme->szgraph() ? graph_adr : -1);
     m->mesh_bvhnum[i] = pme->tree().Nbvh();
     m->mesh_bvhadr[i] = pme->tree().Nbvh() ? bvh_adr : -1;
+    m->mesh_octnum[i] = pme->octree().NumNodes();
+    m->mesh_octadr[i] = pme->octree().NumNodes() ? oct_adr : -1;
     mjuu_copyvec(&m->mesh_scale[3 * i], pme->Scale(), 3);
     mjuu_copyvec(&m->mesh_pos[3 * i], pme->GetPosPtr(), 3);
     mjuu_copyvec(&m->mesh_quat[4 * i], pme->GetQuatPtr(), 4);
@@ -3023,6 +2985,14 @@ void mjCModel::CopyObjects(mjModel* m) {
       }
     }
 
+    // copy octree data
+    if (pme->octree().NumNodes()) {
+      int n_oct = pme->octree().NumNodes();
+      memcpy(m->oct_aabb + 6*oct_adr, pme->octree().Nodes().data(), 6*n_oct*sizeof(mjtNum));
+      memcpy(m->oct_child + 8*oct_adr, pme->octree().Child().data(), 8*n_oct*sizeof(int));
+      memcpy(m->oct_depth + oct_adr, pme->octree().Level().data(), n_oct*sizeof(int));
+    }
+
     // advance counters
     poly_adr += pme->npolygon();
     polyvert_adr += pme->npolygonvert();
@@ -3033,6 +3003,7 @@ void mjCModel::CopyObjects(mjModel* m) {
     face_adr += pme->nface();
     graph_adr += pme->szgraph();
     bvh_adr += pme->tree().Nbvh();
+    oct_adr += pme->octree().NumNodes();
   }
 
   // flexes
@@ -4037,7 +4008,7 @@ void mjCModel::FuseStatic(void) {
   }
 
   // remove empty names
-  processlist(ids, bodies_, mjOBJ_BODY, true);
+  ProcessList_(ids, bodies_, mjOBJ_BODY, /*checkrepeat=*/true);
 }
 
 
@@ -4068,12 +4039,70 @@ void mjCModel::ProcessLists(bool checkrepeat) {
   for (int i = 0; i < mjNOBJECT; i++) {
     if (i != mjOBJ_XBODY && object_lists_[i]) {
       ids[i].clear();
-      processlist(ids, *object_lists_[i], (mjtObj) i, checkrepeat);
+      ProcessList_(ids, *object_lists_[i], (mjtObj) i, checkrepeat);
     }
   }
 
   // check repeated names in meta elements
-  processlist(ids, frames_, mjOBJ_FRAME, checkrepeat);
+  ProcessList_(ids, frames_, mjOBJ_FRAME, checkrepeat);
+}
+
+
+
+// set ids, check for repeated names
+template <class T>
+void mjCModel::ProcessList_(mjListKeyMap& ids, vector<T*>& list,
+                            mjtObj type, bool checkrepeat) {
+  // assign ids for regular elements
+  if (type < mjNOBJECT) {
+    for (size_t i=0; i < list.size(); i++) {
+      // check for incompatible id setting; SHOULD NOT OCCUR
+      if (list[i]->id != -1 && list[i]->id != i) {
+        throw mjCError(list[i], "incompatible id in %s array, position %d", mju_type2Str(type), i);
+      }
+
+      // id equals position in array
+      list[i]->id = i;
+
+      // add to ids map
+      ids[type][list[i]->name] = i;
+    }
+  }
+
+  // check for repeated names
+  if (checkrepeat) {
+    CheckRepeat(type);
+  }
+}
+
+
+
+// check for repeated names in list
+void mjCModel::CheckRepeat(mjtObj type) {
+  std::vector<mjCBase*>* list = nullptr;
+  if (type < mjNOBJECT) {
+    list = object_lists_[type];
+  } else if (type == mjOBJ_FRAME) {
+    list = (std::vector<mjCBase*>*) &frames_;
+  }
+
+  // created vectors with all names
+  vector<string> allnames;
+  for (size_t i=0; i < list->size(); i++) {
+    if (!(*list)[i]->name.empty()) {
+      allnames.push_back((*list)[i]->name);
+    }
+  }
+
+  // sort and check for duplicates
+  if (allnames.size() > 1) {
+    std::sort(allnames.begin(), allnames.end());
+    auto adjacent = std::adjacent_find(allnames.begin(), allnames.end());
+    if (adjacent != allnames.end()) {
+      string msg = "repeated name '" + *adjacent + "' in " + mju_type2Str(type);
+      throw mjCError(nullptr, "%s", msg.c_str());
+    }
+  }
 }
 
 
@@ -4523,7 +4552,7 @@ void mjCModel::TryCompile(mjModel*& m, mjData*& d, const mjVFS* vfs) {
 
   // create low-level model
   mj_makeModel(&m,
-               nq, nv, nu, na, nbody, nbvh, nbvhstatic, nbvhdynamic, njnt, ngeom, nsite,
+               nq, nv, nu, na, nbody, nbvh, nbvhstatic, nbvhdynamic, noct, njnt, ngeom, nsite,
                ncam, nlight, nflex, nflexnode, nflexvert, nflexedge, nflexelem,
                nflexelemdata, nflexelemedge, nflexshelldata, nflexevpair, nflextexcoord,
                nmesh, nmeshvert, nmeshnormal, nmeshtexcoord, nmeshface, nmeshgraph, nmeshpoly,

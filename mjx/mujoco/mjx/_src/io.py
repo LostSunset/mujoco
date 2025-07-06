@@ -248,23 +248,6 @@ def _put_model_jax(
       if t == mujoco.mjtGeom.mjGEOM_MESH:
         mesh_geomid.add(g)
 
-  # check for unsupported sensor and equality constraint combinations
-  sensor_rne_postconstraint = (
-      np.any(m.sensor_type == types.SensorType.ACCELEROMETER)
-      | np.any(m.sensor_type == types.SensorType.FORCE)
-      | np.any(m.sensor_type == types.SensorType.TORQUE)
-      | np.any(m.sensor_type == types.SensorType.FRAMELINACC)
-      | np.any(m.sensor_type == types.SensorType.FRAMEANGACC)
-  )
-  eq_connect_weld = np.any(m.eq_type == types.EqType.CONNECT) | np.any(
-      m.eq_type == types.EqType.WELD
-  )
-  if sensor_rne_postconstraint and eq_connect_weld:
-    raise NotImplementedError(
-        'rne_postconstraint not implemented with equality constraints:'
-        ' connect, weld.'
-    )
-
   for enum_field, enum_type, mj_type in (
       (m.actuator_biastype, types.BiasType, mujoco.mjtBias),
       (m.actuator_dyntype, types.DynType, mujoco.mjtDyn),
@@ -617,7 +600,7 @@ def _make_data_c(
       'moment_rownnz': (m.nu, np.int32),
       'moment_rowadr': (m.nu, np.int32),
       'moment_colind': (m.nJmom, np.int32),
-      'actuator_moment': (m.nu, m.nv, float_),
+      'actuator_moment': (m.nJmom, float_),
       'bvh_aabb_dyn': (nbvhdynamic, 6, float_),
       'bvh_active': (nbvh, np.uint8),
       'flexedge_velocity': (nflexedge, float_),
@@ -957,22 +940,10 @@ def _put_data_c(
   # TODO(stunya): support islanding via C impl.
   impl_fields['solver_niter'] = impl_fields['solver_niter'][0]
 
-  # TODO(btaba): remove dense actuator moment.
-  # convert sparse representation of actuator_moment to dense matrix
-  moment = np.zeros((m.nu, m.nv))
-  mujoco.mju_sparse2dense(
-      moment,
-      d.actuator_moment,
-      d.moment_rownnz,
-      d.moment_rowadr,
-      d.moment_colind,
-  )
-  impl_fields['actuator_moment'] = moment
-
-  # TODO(btaba): remove reliance on JAX _put_contact.
+  # TODO(stunya): remove reliance on JAX _put_contact.
   contact, contact_map = _put_contact(d.contact, dim, efc_address)
 
-  # TODO(btaba): remove reliance on dense efc_J.
+  # TODO(stunya): remove reliance on dense efc_J.
   if mujoco.mj_isSparse(m):
     efc_j = np.zeros((d.efc_J_rownnz.shape[0], m.nv))
     mujoco.mju_sparse2dense(
@@ -1147,13 +1118,16 @@ def _get_data_into(
         moment_colind = np.zeros(m.nJmom, dtype=np.int32)
         actuator_moment = np.zeros(m.nJmom)
         if m.nu:
-          mujoco.mju_dense2sparse(
-              actuator_moment,
-              d_i._impl.actuator_moment,
-              moment_rownnz,
-              moment_rowadr,
-              moment_colind,
-          )
+          if d_i.impl == types.Impl.JAX:
+            mujoco.mju_dense2sparse(
+                actuator_moment,
+                d_i._impl.actuator_moment,
+                moment_rownnz,
+                moment_rowadr,
+                moment_colind,
+            )
+          else:
+            actuator_moment = d_i._impl.actuator_moment
         result_i.moment_rownnz[:] = moment_rownnz
         result_i.moment_rowadr[:] = moment_rowadr
         result_i.moment_colind[:] = moment_colind

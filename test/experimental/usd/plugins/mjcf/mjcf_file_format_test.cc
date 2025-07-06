@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include <gtest/gtest.h>
 #include <mujoco/experimental/usd/mjcPhysics/actuatorAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/collisionAPI.h>
+#include <mujoco/experimental/usd/mjcPhysics/jointAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/meshCollisionAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/sceneAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/siteAPI.h>
@@ -40,6 +42,7 @@
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/sdf/declareHandles.h>
 #include <pxr/usd/sdf/fileFormat.h>
+#include <pxr/usd/sdf/listOp.h>
 #include <pxr/usd/sdf/path.h>
 #include <pxr/usd/sdf/schema.h>
 #include <pxr/usd/usd/common.h>
@@ -47,6 +50,8 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>  // IWYU pragma: keep, used for TraverseAll
 #include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usd/timeCode.h>
+#include <pxr/usd/usd/tokens.h>
 #include <pxr/usd/usdGeom/capsule.h>
 #include <pxr/usd/usdGeom/cube.h>
 #include <pxr/usd/usdGeom/cylinder.h>
@@ -614,8 +619,10 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestGeomsPrims) {
   EXPECT_PRIM_VALID(stage, "/test/box_geom");
   EXPECT_PRIM_IS_A(stage, "/test/box_geom", pxr::UsdGeomCube);
   // Box is a special case, it uses a UsdGeomCube and scales it with
-  // xformOp:scale. The radius is always set to 2.
+  // xformOp:scale. The radius is always set to 2 and the extent from -1 to 1.
   ExpectAttributeEqual(stage, "/test/box_geom.size", 2.0);
+  ExpectAttributeEqual(stage, "/test/box_geom.extent",
+                       pxr::VtArray<pxr::GfVec3f>({{-1, -1, -1}, {1, 1, 1}}));
   ExpectAttributeEqual(stage, "/test/box_geom.xformOp:scale",
                        pxr::GfVec3f(10.0, 20.0, 30.0));
   // Sphere
@@ -969,6 +976,38 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsScenePrimSDFIterations) {
                        60);
 }
 
+TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsScenePrimGravity) {
+  auto stage = pxr::UsdStage::Open(LoadLayer(R"(
+    <mujoco model="test">
+      <option gravity="-123 0 0"> </option>
+    </mujoco>
+  )"));
+
+  ExpectAttributeEqual(stage,
+                       kPhysicsScenePrimPath.AppendProperty(
+                           pxr::UsdPhysicsTokens->physicsGravityMagnitude),
+                       123.0f);
+  ExpectAttributeEqual(stage,
+                       kPhysicsScenePrimPath.AppendProperty(
+                           pxr::UsdPhysicsTokens->physicsGravityDirection),
+                       pxr::GfVec3f(-1.0f, 0.0f, 0.0f));
+
+  stage = pxr::UsdStage::Open(LoadLayer(R"(
+    <mujoco model="test">
+      <option gravity="2 3 6"> </option>
+    </mujoco>
+  )"));
+
+  ExpectAttributeEqual(stage,
+                       kPhysicsScenePrimPath.AppendProperty(
+                           pxr::UsdPhysicsTokens->physicsGravityMagnitude),
+                       7.0f);
+  ExpectAttributeEqual(stage,
+                       kPhysicsScenePrimPath.AppendProperty(
+                           pxr::UsdPhysicsTokens->physicsGravityDirection),
+                       pxr::GfVec3f(0.2857143f, 0.42857143f, 0.85714287f));
+}
+
 TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsScenePrimDisableFlags) {
   auto stage = pxr::UsdStage::Open(LoadLayer(R"(
     <mujoco model="test">
@@ -1129,6 +1168,45 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsToggleSdfFormatArg) {
                           pxr::UsdPhysicsRigidBodyAPI);
 }
 
+TEST_F(MjcfSdfFileFormatPluginTest, TestArticulationRootAppliedOnce) {
+  static constexpr char kXml[] = R"(
+    <mujoco model="physics_test">
+      <worldbody>
+        <body name="parent" pos="0 0 0">
+          <geom name="parent_geom" type="sphere" size="1"/>
+          <body name="child_1" pos="1 0 0">
+            <geom name="child_1_geom" type="sphere" size="1"/>
+          </body>
+          <body name="child_2" pos="2 0 0">
+            <geom name="child_2_geom" type="sphere" size="1"/>
+          </body>
+        </body>
+      </worldbody>
+    </mujoco>
+  )";
+
+  pxr::SdfFileFormat::FileFormatArguments args;
+  args["usdMjcfToggleUsdPhysics"] = "true";
+  pxr::SdfLayerRefPtr layer = LoadLayer(kXml, args);
+
+  // This test is particular in the sense that the authoring mistake, which is
+  // made on the SdfLayer level, would disappear when we access the COMPOSED
+  // stage because duplicates are removed. So we need to check the SdfLayer
+  // directly to see the problem.
+  auto primSpec = layer->GetPrimAtPath(pxr::SdfPath("/physics_test/parent"));
+  EXPECT_TRUE(primSpec);
+
+  pxr::VtValue apiSchemasValue = primSpec->GetInfo(pxr::UsdTokens->apiSchemas);
+  const pxr::SdfTokenListOp& listOp =
+      apiSchemasValue.UncheckedGet<pxr::SdfTokenListOp>();
+  const pxr::SdfTokenListOp::ItemVector& prependedItems =
+      listOp.GetPrependedItems();
+
+  int count = std::count(prependedItems.begin(), prependedItems.end(),
+                         pxr::UsdPhysicsTokens->PhysicsArticulationRootAPI);
+  EXPECT_EQ(count, 1);
+}
+
 TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsRigidBody) {
   static constexpr char kXml[] = R"(
     <mujoco model="physics_test">
@@ -1169,13 +1247,13 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsRigidBody) {
   // test_body_3 is a child of the world but has no children so should not be
   // an articulation root.
   EXPECT_PRIM_API_NOT_APPLIED(stage, "/physics_test/test_body_3",
-                          pxr::UsdPhysicsArticulationRootAPI);
+                              pxr::UsdPhysicsArticulationRootAPI);
 
   // Articulation root is not applied to other bodies or world body.
   EXPECT_PRIM_API_NOT_APPLIED(stage, "/physics_test",
-                          pxr::UsdPhysicsArticulationRootAPI);
+                              pxr::UsdPhysicsArticulationRootAPI);
   EXPECT_PRIM_API_NOT_APPLIED(stage, "/physics_test/test_body/test_body_2",
-                          pxr::UsdPhysicsArticulationRootAPI);
+                              pxr::UsdPhysicsArticulationRootAPI);
 
   // Geoms should not have RigidBodyAPI applied either.
   EXPECT_PRIM_API_NOT_APPLIED(stage, "/physics_test/test_body/test_geom",
@@ -1589,6 +1667,69 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsSliderCrankActuator) {
   ExpectAttributeEqual(stage, "/test/body/crank.mjc:crankLength", 1.23);
 }
 
+TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsJointAPI) {
+  static constexpr char xml[] = R"(
+  <mujoco model="test">
+    <worldbody>
+      <body name="parent">
+        <body name="child">
+          <joint name="my_joint" type="hinge"
+            springdamper="1 2"
+            solreflimit="0.1 0.2"
+            solimplimit="0.3 0.4 0.5 0.6 0.7"
+            solreffriction="0.8 0.9"
+            solimpfriction="1.0 1.1 1.2 1.3 1.4"
+            stiffness="1.5"
+            actuatorfrcrange="-1.6 1.7"
+            actuatorfrclimited="true"
+            actuatorgravcomp="true"
+            margin="1.8"
+            ref="1.9"
+            springref="2.0"
+            armature="2.1"
+            damping="2.2"
+            frictionloss="2.3"
+          />
+          <geom type="sphere" size="1"/>
+        </body>
+      </body>
+    </worldbody>
+  </mujoco>
+  )";
+  auto stage = OpenStageWithPhysics(xml);
+
+  const SdfPath joint_path("/test/parent/child/my_joint");
+  EXPECT_PRIM_API_APPLIED(stage, joint_path, pxr::MjcPhysicsJointAPI);
+
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:springdamper",
+                       pxr::VtArray<double>({1, 2}));
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:solreflimit",
+                       pxr::VtArray<double>({0.1, 0.2}));
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:solimplimit",
+                       pxr::VtArray<double>({0.3, 0.4, 0.5, 0.6, 0.7}));
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:solreffriction",
+                       pxr::VtArray<double>({0.8, 0.9}));
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:solimpfriction",
+                       pxr::VtArray<double>({1.0, 1.1, 1.2, 1.3, 1.4}));
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:stiffness", 1.5);
+  ExpectAttributeEqual(
+      stage, "/test/parent/child/my_joint.mjc:actuatorfrcrange:min", -1.6);
+  ExpectAttributeEqual(
+      stage, "/test/parent/child/my_joint.mjc:actuatorfrcrange:max", 1.7);
+  ExpectAttributeEqual(stage,
+                       "/test/parent/child/my_joint.mjc:actuatorfrclimited",
+                       MjcPhysicsTokens->true_);
+  ExpectAttributeEqual(
+      stage, "/test/parent/child/my_joint.mjc:actuatorgravcomp", true);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:margin", 1.8);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:ref", 1.9);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:springref", 2.0);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:armature", 2.1);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:damping", 2.2);
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:frictionloss",
+                       2.3);
+}
+
 TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsFloatingAndFixedBaseBody) {
   static constexpr char kXml[] = R"(
     <mujoco model="test">
@@ -1929,6 +2070,38 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestPhysicsUnsupportedJoint) {
 
   EXPECT_PRIM_INVALID(stage, "/test/parent/ball_joint");
 }
+
+TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsKeyframe) {
+  static constexpr char xml[] = R"(
+  <mujoco model="test">
+      <worldbody>
+        <frame name="frame"/>
+        <body name="body">
+          <joint/>
+          <geom size="0.1"/>
+        </body>
+      </worldbody>
+      <keyframe>
+        <key name="home" qpos="1"/>
+        <key time="1" qpos="2"/>
+        <key time="2" qpos="3"/>
+      </keyframe>
+    </mujoco>)";
+  auto stage = OpenStageWithPhysics(xml);
+
+  EXPECT_PRIM_VALID(stage, "/test/Keyframes/home");
+  EXPECT_PRIM_VALID(stage, "/test/Keyframes/Keyframe");
+  ExpectAttributeEqual(stage, "/test/Keyframes/home.mjc:qpos",
+                       pxr::VtDoubleArray({1}));
+
+  // Check time samples are correctly authored.
+  ExpectAttributeEqual(stage, "/test/Keyframes/Keyframe.mjc:qpos",
+                       pxr::VtDoubleArray({2}), pxr::UsdTimeCode(1.0));
+
+  ExpectAttributeEqual(stage, "/test/Keyframes/Keyframe.mjc:qpos",
+                       pxr::VtDoubleArray({3}), pxr::UsdTimeCode(2.0));
+}
+
 }  // namespace
 }  // namespace usd
 }  // namespace mujoco

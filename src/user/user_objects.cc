@@ -404,9 +404,15 @@ mjCBoundingVolumeHierarchy::AddBoundingVolume(const int* id, int contype, int co
 
 // create bounding volume hierarchy
 void mjCBoundingVolumeHierarchy::CreateBVH() {
+  std::vector<BVElement> elements;
+  Make(elements);
+  MakeBVH(elements.begin(), elements.end());
+}
+
+
+void mjCBoundingVolumeHierarchy::Make(std::vector<BVElement>& elements) {
   // precompute the positions of each element in the hierarchy's axes, and drop
   // visual-only elements.
-  std::vector<BVElement> elements;
   elements.reserve(bvleaf_.size());
   double qinv[4] = {iquat_[0], -iquat_[1], -iquat_[2], -iquat_[3]};
   for (int i = 0; i < bvleaf_.size(); i++) {
@@ -420,8 +426,8 @@ void mjCBoundingVolumeHierarchy::CreateBVH() {
       elements.push_back(std::move(element));
     }
   }
-  MakeBVH(elements.begin(), elements.end());
 }
+
 
 // compute bounding volume hierarchy
 int mjCBoundingVolumeHierarchy::MakeBVH(
@@ -546,9 +552,108 @@ int mjCBoundingVolumeHierarchy::MakeBVH(
   return index;
 }
 
+
+
+//------------------------- class mjCOctree implementation --------------------------------------------
+
+void mjCOctree::SetFace(const std::vector<double>& vert, const std::vector<int>& face) {
+  for (int i = 0; i < face.size(); i += 3) {
+    std::array<double, 3> v0 = {vert[3*face[i+0]], vert[3*face[i+0]+1], vert[3*face[i+0]+2]};
+    std::array<double, 3> v1 = {vert[3*face[i+1]], vert[3*face[i+1]+1], vert[3*face[i+1]+2]};
+    std::array<double, 3> v2 = {vert[3*face[i+2]], vert[3*face[i+2]+1], vert[3*face[i+2]+2]};
+    face_.push_back({v0, v1, v2});
+  }
+}
+
+
+// TODO: use the same code as mjCBoundingVolumeHierarchy::Make()
+void mjCOctree::Make(std::vector<Triangle>& elements) {
+  // rotate triangles to the body inertial frame
+  elements.assign(face_.size(), {{{0}}});
+  double qinv[4] = {iquat_[0], -iquat_[1], -iquat_[2], -iquat_[3]};
+  for (int i = 0; i < face_.size(); i++) {
+    for (int j = 0; j < 3; j++) {
+      double vert[3] = {face_[i][j][0] - ipos_[0],
+                        face_[i][j][1] - ipos_[1],
+                        face_[i][j][2] - ipos_[2]};
+      mjuu_rotVecQuat(elements[i][j].data(), vert, qinv);
+    }
+  }
+}
+
+
+void mjCOctree::CreateOctree(const double aamm[6]) {
+  std::vector<Triangle> elements;
+  Make(elements);
+  std::vector<Triangle*> elements_ptrs(elements.size());
+  std::transform(elements.begin(), elements.end(), elements_ptrs.begin(),
+                 [](Triangle& triangle) { return &triangle; });
+  MakeOctree(elements_ptrs, aamm);
+}
+
+
+static bool boxTriangle(const Triangle& element, const double aamm[6]) {
+  for (int i = 0; i < 3; i++) {
+    if (element[0][i] < aamm[i] && element[1][i] < aamm[i] && element[2][i] < aamm[i]) {
+      return false;
+    }
+    int j = i + 3;
+    if (element[0][i] > aamm[j] && element[1][i] > aamm[j] && element[2][i] > aamm[j]) {
+      return false;
+    }
+  }
+  // TODO: add additionally separating axis tests
+  return true;
+}
+
+
+int mjCOctree::MakeOctree(const std::vector<Triangle*>& elements, const double aamm[6], int lev) {
+  level_.push_back(lev);
+
+  // create a new node
+  int index = nnode_++;
+  double aabb[6] = {(aamm[0] + aamm[3]) / 2, (aamm[1] + aamm[4]) / 2, (aamm[2] + aamm[5]) / 2,
+                    (aamm[3] - aamm[0]) / 2, (aamm[4] - aamm[1]) / 2, (aamm[5] - aamm[2]) / 2};
+  for (int i = 0; i < 6; i++) {
+    node_.push_back(aabb[i]);
+  }
+  for (int i = 0; i < 8; i++) {
+    child_.push_back(-1);
+  }
+
+  // find all triangles that intersect the current box
+  std::vector<Triangle*> colliding;
+  for (auto* element : elements) {
+    if (boxTriangle(*element, aamm)) {
+      colliding.push_back(element);
+    }
+  }
+
+  // return if the box is empty
+  if (colliding.empty() || lev >= 6) {
+    return index;
+  }
+
+  // split the box into 8 sub-boxes
+  double new_aamm[8][6];
+  for (int i = 0; i < 8; i++) {
+    new_aamm[i][0] = aabb[0] + aabb[3] * (i & 1 ? -1 : 0);
+    new_aamm[i][1] = aabb[1] + aabb[4] * (i & 2 ? -1 : 0);
+    new_aamm[i][2] = aabb[2] + aabb[5] * (i & 4 ? -1 : 0);
+    new_aamm[i][3] = aabb[0] + aabb[3] * (i & 1 ? 0 : 1);
+    new_aamm[i][4] = aabb[1] + aabb[4] * (i & 2 ? 0 : 1);
+    new_aamm[i][5] = aabb[2] + aabb[5] * (i & 4 ? 0 : 1);
+  }
+
+  // recursive calls to create sub-boxes
+  for (int i = 0; i < 8; i++) {
+    child_[8*index + i] = MakeOctree(colliding, new_aamm[i], lev + 1);
+  }
+
+  return index;
+}
+
 //------------------------- class mjCDef implementation --------------------------------------------
-
-
 
 // constructor
 mjCDef::mjCDef() {
@@ -642,6 +747,7 @@ void mjCDef::NameSpace(const mjCModel* m) {
 
 void mjCDef::CopyWithoutChildren(const mjCDef& other) {
   name = other.name;
+  elemtype = other.elemtype;
   parent = nullptr;
   child.clear();
   joint_ = other.joint_;
@@ -675,7 +781,6 @@ void mjCDef::PointToLocal() {
   tendon_.PointToLocal();
   actuator_.PointToLocal();
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.joint = &joint_.spec;
   spec.geom = &geom_.spec;
   spec.site = &site_.spec;
@@ -1156,7 +1261,6 @@ void mjCBody::ResetId() {
 
 void mjCBody::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.childclass = &classname;
   spec.userdata = &spec_userdata_;
   spec.plugin.plugin_name = &plugin_name;
@@ -1299,7 +1403,6 @@ mjCJoint* mjCBody::AddFreeJoint() {
   model->ResetTreeLists();
   model->MakeTreeLists();
 
-
   // update signature
   model->spec.element->signature = model->Signature();
   return obj;
@@ -1320,7 +1423,6 @@ mjCJoint* mjCBody::AddJoint(mjCDef* _def) {
   // recompute lists
   model->ResetTreeLists();
   model->MakeTreeLists();
-
 
   // update signature
   model->spec.element->signature = model->Signature();
@@ -1343,7 +1445,6 @@ mjCGeom* mjCBody::AddGeom(mjCDef* _def) {
   model->ResetTreeLists();
   model->MakeTreeLists();
 
-
   // update signature
   model->spec.element->signature = model->Signature();
   return obj;
@@ -1364,7 +1465,6 @@ mjCSite* mjCBody::AddSite(mjCDef* _def) {
   // recompute lists
   model->ResetTreeLists();
   model->MakeTreeLists();
-
 
   // update signature
   model->spec.element->signature = model->Signature();
@@ -1387,7 +1487,6 @@ mjCCamera* mjCBody::AddCamera(mjCDef* _def) {
   model->ResetTreeLists();
   model->MakeTreeLists();
 
-
   // update signature
   model->spec.element->signature = model->Signature();
   return obj;
@@ -1408,7 +1507,6 @@ mjCLight* mjCBody::AddLight(mjCDef* _def) {
   // recompute lists
   model->ResetTreeLists();
   model->MakeTreeLists();
-
 
   // update signature
   model->spec.element->signature = model->Signature();
@@ -1558,29 +1656,41 @@ mjCBase* mjCBody::FindObject(mjtObj type, std::string _name, bool recursive) {
 
 
 
+// return true if child is descendant of this body
+bool mjCBody::IsAncestor(const mjCBody* child) const {
+  if (!child) {
+    return false;
+  }
+
+  if (child == this) {
+    return true;
+  }
+
+  return IsAncestor(child->parent);
+}
+
+
+
 template <class T>
-mjsElement* mjCBody::GetNext(const std::vector<T*>& list, const mjsElement* child, bool* found) {
+mjsElement* mjCBody::GetNext(const std::vector<T*>& list, const mjsElement* child) {
   if (list.empty()) {
     // no children
     return nullptr;
   }
 
-  if (!child) {
-    // first child
-    return list[0]->spec.element;
-  }
+  for (unsigned int i = 0; i < list.size() - (child ? 1 : 0); i++) {
+    if (!IsAncestor(list[i]->GetParent())) {
+      continue;  // TODO: this recursion is wasteful
+    }
 
-  for (unsigned int i = 0; i < list.size()-1; i++) {
+    // first child in this body
+    if (!child) {
+      return list[i]->spec.element;
+
     // next child is in this body
-    if (list[i]->spec.element == child) {
-      *found = true;
+    } else if (list[i]->spec.element == child && IsAncestor(list[i+1]->GetParent())) {
       return list[i+1]->spec.element;
     }
-  }
-
-  if (list.back()->spec.element == child) {
-    // next child is in another body
-    *found = true;
   }
 
   return nullptr;
@@ -1589,7 +1699,7 @@ mjsElement* mjCBody::GetNext(const std::vector<T*>& list, const mjsElement* chil
 
 
 // get next child of given type
-mjsElement* mjCBody::NextChild(const mjsElement* child, mjtObj type, bool recursive, bool* found) {
+mjsElement* mjCBody::NextChild(const mjsElement* child, mjtObj type, bool recursive) {
   if (type == mjOBJ_UNKNOWN) {
     if (!child) {
       throw mjCError(this, "child type must be specified if no child element is given");
@@ -1600,49 +1710,36 @@ mjsElement* mjCBody::NextChild(const mjsElement* child, mjtObj type, bool recurs
     throw mjCError(this, "child element is not of requested type");
   }
 
-  bool found_ = false;
-  if (!found) {
-    found = &found_;
-  }
 
   mjsElement* candidate = nullptr;
   switch (type) {
     case mjOBJ_BODY:
     case mjOBJ_XBODY:
-      candidate = GetNext(bodies, child, found);
+      candidate = GetNext(recursive ? model->bodies_ : bodies, child);
       break;
     case mjOBJ_JOINT:
-      candidate = GetNext(joints, child, found);
+      candidate = GetNext(recursive ? model->joints_ : joints, child);
       break;
     case mjOBJ_GEOM:
-      candidate = GetNext(geoms, child, found);
+      candidate = GetNext(recursive ? model->geoms_ : geoms, child);
       break;
     case mjOBJ_SITE:
-      candidate = GetNext(sites, child, found);
+      candidate = GetNext(recursive ? model->sites_ : sites, child);
       break;
     case mjOBJ_CAMERA:
-      candidate = GetNext(cameras, child, found);
+      candidate = GetNext(recursive ? model->cameras_ : cameras, child);
       break;
     case mjOBJ_LIGHT:
-      candidate = GetNext(lights, child, found);
+      candidate = GetNext(recursive ? model->lights_ : lights, child);
       break;
     case mjOBJ_FRAME:
-      candidate = GetNext(frames, child, found);
+      candidate = GetNext(recursive ? model->frames_ : frames, child);
       break;
     default:
       throw mjCError(this,
                      "Body.NextChild supports the types: body, frame, geom, "
                      "site, light, camera");
       break;
-  }
-
-  if (!candidate && recursive) {
-    for (int i=0; i < (int)bodies.size(); i++) {
-      candidate = bodies[i]->NextChild(*found ? nullptr : child, type, recursive, found);
-      if (candidate) {
-        return candidate;
-      }
-    }
   }
 
   return candidate;
@@ -2205,7 +2302,6 @@ bool mjCFrame::IsAncestor(const mjCFrame* child) const {
 
 void mjCFrame::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.childclass = &classname;
   spec.info = &info;
 }
@@ -2356,7 +2452,6 @@ mjtNum* mjCJoint::qvel(const std::string& state_name) {
 
 void mjCJoint::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.userdata = &spec_userdata_;
   spec.info = &info;
   userdata = nullptr;
@@ -2554,7 +2649,6 @@ mjCGeom& mjCGeom::operator=(const mjCGeom& other) {
 // to be called after any default copy constructor
 void mjCGeom::PointToLocal(void) {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.info = &info;
   spec.userdata = &spec_userdata_;
   spec.material = &spec_material_;
@@ -3376,7 +3470,6 @@ mjCSite& mjCSite::operator=(const mjCSite& other) {
 
 void mjCSite::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.info = &info;
   spec.material = &spec_material_;
   spec.userdata = &spec_userdata_;
@@ -3537,7 +3630,6 @@ mjCCamera& mjCCamera::operator=(const mjCCamera& other) {
 
 void mjCCamera::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.userdata = &spec_userdata_;
   spec.targetbody = &spec_targetbody_;
   spec.info = &info;
@@ -3695,7 +3787,6 @@ mjCLight& mjCLight::operator=(const mjCLight& other) {
 
 void mjCLight::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.targetbody = &spec_targetbody_;
   spec.texture = &spec_texture_;
   spec.info = &info;
@@ -3815,7 +3906,6 @@ mjCHField& mjCHField::operator=(const mjCHField& other) {
 
 void mjCHField::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.file = &spec_file_;
   spec.content_type = &spec_content_type_;
   spec.userdata = &spec_userdata_;
@@ -4080,7 +4170,6 @@ mjCTexture& mjCTexture::operator=(const mjCTexture& other) {
 
 void mjCTexture::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.file = &spec_file_;
   spec.data = &data_;
   spec.content_type = &spec_content_type_;
@@ -4949,7 +5038,6 @@ mjCMaterial& mjCMaterial::operator=(const mjCMaterial& other) {
 
 void mjCMaterial::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.textures = &spec_textures_;
   spec.info = &info;
   textures = nullptr;
@@ -5039,7 +5127,6 @@ mjCPair& mjCPair::operator=(const mjCPair& other) {
 
 void mjCPair::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.geomname1 = &spec_geomname1_;
   spec.geomname2 = &spec_geomname2_;
   geomname1 = nullptr;
@@ -5262,7 +5349,6 @@ mjCBodyPair& mjCBodyPair::operator=(const mjCBodyPair& other) {
 
 void mjCBodyPair::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.bodyname1 = &spec_bodyname1_;
   spec.bodyname2 = &spec_bodyname2_;
   spec.info = &info;
@@ -5397,7 +5483,6 @@ mjCEquality& mjCEquality::operator=(const mjCEquality& other) {
 
 void mjCEquality::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.name1 = &spec_name1_;
   spec.name2 = &spec_name2_;
   spec.info = &info;
@@ -5574,7 +5659,6 @@ bool mjCTendon::is_actfrclimited() const {
 
 void mjCTendon::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.material = &spec_material_;
   spec.userdata = &spec_userdata_;
   spec.info = &info;
@@ -6120,7 +6204,6 @@ mjtNum& mjCActuator::ctrl(const std::string& state_name) {
 
 void mjCActuator::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.userdata = &spec_userdata_;
   spec.target = &spec_target_;
   spec.refsite = &spec_refsite_;
@@ -6458,7 +6541,6 @@ mjCSensor& mjCSensor::operator=(const mjCSensor& other) {
 
 void mjCSensor::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.userdata = &spec_userdata_;
   spec.objname = &spec_objname_;
   spec.refname = &spec_refname_;
@@ -6998,7 +7080,6 @@ mjCNumeric& mjCNumeric::operator=(const mjCNumeric& other) {
 
 void mjCNumeric::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.data = &spec_data_;
   spec.info = &info;
   data = nullptr;
@@ -7088,7 +7169,6 @@ mjCText& mjCText::operator=(const mjCText& other) {
 
 void mjCText::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.data = &spec_data_;
   spec.info = &info;
   data = nullptr;
@@ -7169,7 +7249,6 @@ mjCTuple& mjCTuple::operator=(const mjCTuple& other) {
 
 void mjCTuple::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.objtype = (mjIntVec*)&spec_objtype_;
   spec.objname = &spec_objname_;
   spec.objprm = &spec_objprm_;
@@ -7305,7 +7384,6 @@ mjCKey& mjCKey::operator=(const mjCKey& other) {
 
 void mjCKey::PointToLocal() {
   spec.element = static_cast<mjsElement*>(this);
-  spec.name = &name;
   spec.qpos = &spec_qpos_;
   spec.qvel = &spec_qvel_;
   spec.act = &spec_act_;
@@ -7451,7 +7529,6 @@ mjCPlugin::mjCPlugin(mjCModel* _model) {
   mjs_defaultPlugin(&spec);
   elemtype = mjOBJ_PLUGIN;
   spec.plugin_name = &plugin_name;
-  spec.name = &name;
   spec.info = &info;
 
   PointToLocal();

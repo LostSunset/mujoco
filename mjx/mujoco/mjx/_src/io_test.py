@@ -289,7 +289,10 @@ class DataIOTest(parameterized.TestCase):
     self.assertEqual(d._impl.cinert.shape, (nbody, 10))
     self.assertEqual(d._impl.crb.shape, (nbody, 10))
     self.assertEqual(d._impl.actuator_length.shape, (1,))
-    self.assertEqual(d._impl.actuator_moment.shape, (1, nv))
+    if impl == 'jax':
+      self.assertEqual(d._impl.actuator_moment.shape, (1, nv))
+    elif impl == 'c':
+      self.assertEqual(d._impl.actuator_moment.shape, (m.nJmom,))
     self.assertEqual(d._impl.contact.dist.shape, (ncon,))
     self.assertEqual(d._impl.contact.pos.shape, (ncon, 3))
     self.assertEqual(d._impl.contact.frame.shape, (ncon, 3, 3))
@@ -624,38 +627,6 @@ class DataIOTest(parameterized.TestCase):
     m.opt.cone = ConeType.ELLIPTIC
     with self.assertRaises(NotImplementedError):
       mjx.make_data(m)
-
-  @parameterized.product(
-      sensor=['accelerometer', 'force', 'torque'], equality=['connect', 'weld']
-  )
-  def test_sensor_constraint_compatibility(self, sensor, equality):
-    """Test unsupported sensor and equality constraint combinations."""
-    equality_constraint = f'{equality} body1="body1" body2="body2"'
-    if equality == 'connect':
-      equality_constraint += ' anchor="0 0 0"'
-    m = mujoco.MjModel.from_xml_string(f"""
-        <mujoco>
-          <worldbody>
-            <body name="body1">
-              <freejoint/>
-              <geom size="0.1"/>
-              <site name="site1"/>
-            </body>
-            <body name="body2">
-              <freejoint/>
-              <geom size="0.1"/>
-            </body>
-          </worldbody>
-          <equality>
-            <{equality_constraint}/>
-          </equality>
-          <sensor>
-            <{sensor} site="site1"/>
-          </sensor>
-        </mujoco>
-      """)
-    with self.assertRaises(NotImplementedError):
-      mjx.put_model(m, impl='jax')
 
   @parameterized.parameters(JacobianType.DENSE, JacobianType.SPARSE)
   def test_qm_mapm2m(self, jacobian):

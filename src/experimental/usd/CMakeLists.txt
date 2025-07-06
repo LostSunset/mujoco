@@ -175,6 +175,8 @@ add_library(${MJC_PHYSICS_PLUGIN_TARGET_NAME} SHARED)
 target_sources(${MJC_PHYSICS_PLUGIN_TARGET_NAME} PRIVATE
   mjcPhysics/actuatorAPI.cpp
   mjcPhysics/collisionAPI.cpp
+  mjcPhysics/jointAPI.cpp
+  mjcPhysics/keyframe.cpp
   mjcPhysics/meshCollisionAPI.cpp
   mjcPhysics/sceneAPI.cpp
   mjcPhysics/siteAPI.cpp
@@ -193,10 +195,15 @@ target_include_directories(${MJC_PHYSICS_PLUGIN_TARGET_NAME} PUBLIC
 add_library(${MJ_USD_TARGET_NAME} SHARED)
 add_library(mujoco::usd ALIAS ${MJ_USD_TARGET_NAME})
 target_sources(${MJ_USD_TARGET_NAME} PRIVATE
-  writer.cc
+  kinematic_tree.cc
+  kinematic_tree.h
   layer_sink.cc
   usd_to_mjspec.cc
   utils.cc
+  writer.cc
+)
+target_include_directories(${MJ_USD_TARGET_NAME} PUBLIC
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../"
 )
 
 

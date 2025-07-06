@@ -3866,8 +3866,7 @@ Add frame to body.
 
 .. mujoco-include:: mjs_delete
 
-Delete object corresponding to the given element, return 0 on success. This function should only be used for element
-types that cannot have children, i.e. excluding bodies and default classes.
+Remove object corresponding to the given element, return 0 on success.
 
 .. _AddNonTreeElements:
 
@@ -4228,6 +4227,15 @@ Return spec's next element; return NULL if element is last.
 
 Attribute setters
 ^^^^^^^^^^^^^^^^^
+.. _mjs_setName:
+
+`mjs_setName <#mjs_setName>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_setName
+
+Set element's name, return 0 on success.
+
 .. _mjs_setBuffer:
 
 `mjs_setBuffer <#mjs_setBuffer>`__
@@ -4331,6 +4339,15 @@ Set plugin attributes.
 
 Attribute getters
 ^^^^^^^^^^^^^^^^^
+.. _mjs_getName:
+
+`mjs_getName <#mjs_getName>`__
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. mujoco-include:: mjs_getName
+
+Get element's name.
+
 .. _mjs_getString:
 
 `mjs_getString <#mjs_getString>`__
