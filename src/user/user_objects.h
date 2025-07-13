@@ -222,6 +222,7 @@ struct mjCOctree_ {
   std::vector<int> child_;           // children of each node     (nnode x 8)
   std::vector<double> node_;         // bounding boxes            (nnode x 6)
   std::vector<int> level_;           // levels of each node       (nnode x 1)
+  std::vector<double> coeff_;        // interpo coefficients      (nnode x 8)
   std::vector<Triangle> face_;       // mesh faces                (nface x 3)
   double ipos_[3] = {0, 0, 0};
   double iquat_[4] = {1, 0, 0, 0};
@@ -246,6 +247,8 @@ class mjCOctree : public mjCOctree_ {
     level_.clear();
     face_.clear();
   }
+  void AddCoeff(double coeff) { coeff_.push_back(coeff); }
+  const std::vector<double>& Coeff() const { return coeff_; }
 
  private:
   void Make(std::vector<Triangle>& elements);
@@ -1000,6 +1003,7 @@ class mjCMesh_ : public mjCBase {
   std::vector<int> spec_facetexcoord_;
 
   // used by the compiler
+  bool needreorient_;                            // needs reorientation
   bool needoct_;                                 // needs octree
   bool visual_;                                  // true: the mesh is only visual
   std::vector< std::pair<int, int> > halfedge_;  // half-edge data
@@ -1593,10 +1597,10 @@ class mjCTendon : public mjCTendon_, private mjsTendon {
   void del_material() { material_.clear(); }
 
   // API for adding wrapping objects
-  void WrapSite(std::string name, std::string_view info = "");                    // site
-  void WrapGeom(std::string name, std::string side, std::string_view info = "");  // geom
-  void WrapJoint(std::string name, double coef, std::string_view info = "");      // joint
-  void WrapPulley(double divisor, std::string_view info = "");                    // pulley
+  void WrapSite(std::string wrapname, std::string_view wrapinfo = "");                    // site
+  void WrapGeom(std::string wrapname, std::string side, std::string_view wrapinfo = "");  // geom
+  void WrapJoint(std::string wrapname, double coef, std::string_view wrapinfo = "");      // joint
+  void WrapPulley(double divisor, std::string_view wrapinfo = "");                        // pulley
 
   // API for access to wrapping objects
   int NumWraps() const;                       // number of wraps
@@ -1764,8 +1768,6 @@ class mjCActuator : public mjCActuator_, private mjsActuator {
 
 class mjCSensor_ : public mjCBase {
  protected:
-  int refid;                      // id of reference frame
-
   // variable-size data
   std::string plugin_name;
   std::string plugin_instance_name;

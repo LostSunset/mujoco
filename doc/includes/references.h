@@ -725,7 +725,8 @@ typedef enum mjtSensor_ {         // type of sensor
   mjSENS_SUBTREELINVEL,           // 3D linear velocity of subtree
   mjSENS_SUBTREEANGMOM,           // 3D angular momentum of subtree
 
-  // sensors for geometric distance; attached to geoms or bodies
+  // sensors of geometric relationships
+  mjSENS_INSIDESITE,              // 1 if object is inside a site, 0 otherwise
   mjSENS_GEOMDIST,                // signed distance between two geoms
   mjSENS_GEOMNORMAL,              // normal direction between two geoms
   mjSENS_GEOMFROMTO,              // segment between two geoms
@@ -1097,6 +1098,7 @@ struct mjModel_ {
   int*      oct_depth;            // depth in the octree                      (noct x 1)
   int*      oct_child;            // children of octree node                  (noct x 8)
   mjtNum*   oct_aabb;             // octree node bounding box (center, size)  (noct x 6)
+  mjtNum*   oct_coeff;            // octree interpolation coefficients        (noct x 8)
 
   // joints
   int*      jnt_type;             // type of joint (mjtJoint)                 (njnt x 1)
@@ -1457,6 +1459,7 @@ struct mjModel_ {
   int*      sensor_objid;         // id of sensorized object                  (nsensor x 1)
   int*      sensor_reftype;       // type of reference frame (mjtObj)         (nsensor x 1)
   int*      sensor_refid;         // id of reference frame; -1: global frame  (nsensor x 1)
+  int*      sensor_intprm;        // sensor parameters                        (nsensor x mjNSENS)
   int*      sensor_dim;           // number of scalar outputs                 (nsensor x 1)
   int*      sensor_adr;           // address in sensor array                  (nsensor x 1)
   mjtNum*   sensor_cutoff;        // cutoff for real and positive; 0: ignore  (nsensor x 1)
@@ -2323,6 +2326,7 @@ typedef struct mjsSensor_ {        // sensor specification
   mjString* objname;               // name of sensorized object
   mjtObj reftype;                  // type of referenced object
   mjString* refname;               // name of referenced object
+  int intprm[mjNSENS];             // integer parameters
 
   // user-defined sensors
   mjtDataType datatype;            // data type for sensor measurement

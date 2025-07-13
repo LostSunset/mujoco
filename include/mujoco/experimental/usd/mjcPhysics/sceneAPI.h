@@ -35,12 +35,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 class SdfAssetPath;
 
 // -------------------------------------------------------------------------- //
-// SCENEAPI                                                                   //
+// MJCSCENEAPI                                                                //
 // -------------------------------------------------------------------------- //
 
 /// \class MjcPhysicsSceneAPI
 ///
-/// API providing global simulation options for Mujoco.
+/// API providing global simulation options for MuJoCo.
 ///
 /// For any described attribute \em Fallback \em Value or \em Allowed \em Values
 /// below that are text/tokens, the actual token is published and defined in
@@ -110,7 +110,7 @@ class MjcPhysicsSceneAPI : public UsdAPISchemaBase {
   static bool CanApply(const UsdPrim &prim, std::string *whyNot = nullptr);
 
   /// Applies this <b>single-apply</b> API schema to the given \p prim.
-  /// This information is stored by adding "SceneAPI" to the
+  /// This information is stored by adding "MjcSceneAPI" to the
   /// token-valued, listOp metadata \em apiSchemas on the prim.
   ///
   /// \return A valid MjcPhysicsSceneAPI object is returned upon success.
@@ -773,7 +773,7 @@ class MjcPhysicsSceneAPI : public UsdAPISchemaBase {
   ///
   /// | ||
   /// | -- | -- |
-  /// | Declaration | `uniform int[] mjc:option:actuatorgroupdisable` |
+  /// | Declaration | `uniform int[] mjc:option:actuatorgroupdisable = []` |
   /// | C++ Type | VtArray<int> |
   /// | \ref Usd_Datatypes "Usd Type" | SdfValueTypeNames->IntArray |
   /// | \ref SdfVariability "Variability" | SdfVariabilityUniform |

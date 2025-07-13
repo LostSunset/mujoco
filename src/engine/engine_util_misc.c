@@ -422,9 +422,8 @@ mjtNum mju_wrap(mjtNum wpnt[6], const mjtNum x0[3], const mjtNum x1[3],
 
 
 // all 3 semi-axes of a geom
-void mju_geomSemiAxes(const mjModel* m, int geom_id, mjtNum semiaxes[3]) {
-  mjtNum* size = m->geom_size + 3*geom_id;
-  switch ((mjtGeom) m->geom_type[geom_id]) {
+void mju_geomSemiAxes(mjtNum semiaxes[3], const mjtNum size[3], mjtGeom type) {
+  switch (type) {
   case mjGEOM_SPHERE:
     semiaxes[0] = size[0];
     semiaxes[1] = size[0];
@@ -450,6 +449,53 @@ void mju_geomSemiAxes(const mjModel* m, int geom_id, mjtNum semiaxes[3]) {
   }
 }
 
+
+// return 1 if point is inside a primitive geom, 0 otherwise
+int mju_insideGeom(const mjtNum pos[3], const mjtNum mat[9], const mjtNum size[3], mjtGeom type,
+                   const mjtNum point[3]) {
+  // vector from geom to point
+  mjtNum vec[3];
+  mju_sub3(vec, point, pos);
+
+  // quick return for spheres, frame rotation not required
+  if (type == mjGEOM_SPHERE) {
+    return mju_dot3(vec, vec) < size[0]*size[0];
+  }
+
+  // rotate into local frame
+  mjtNum plocal[3];
+  mju_mulMatTVec3(plocal, mat, vec);
+
+  // handle other geom types
+  switch (type) {
+  case mjGEOM_CAPSULE: {
+    mjtNum z = plocal[2];
+    mjtNum z_clamped = mju_clip(z, -size[1], size[1]);
+    mjtNum z_dist_sq = (z - z_clamped) * (z - z_clamped);
+    return (plocal[0]*plocal[0] + plocal[1]*plocal[1] + z_dist_sq < size[0]*size[0]);
+  }
+
+  case mjGEOM_ELLIPSOID:
+    return (plocal[0]*plocal[0]/(size[0]*size[0]) +
+            plocal[1]*plocal[1]/(size[1]*size[1]) +
+            plocal[2]*plocal[2]/(size[2]*size[2]) < 1);
+
+  case mjGEOM_CYLINDER:
+    return (mju_abs(plocal[2]) < size[1] &&
+            plocal[0]*plocal[0] + plocal[1]*plocal[1] < size[0]*size[0]);
+
+  case mjGEOM_BOX:
+    return (mju_abs(plocal[0]) < size[0] &&
+            mju_abs(plocal[1]) < size[1] &&
+            mju_abs(plocal[2]) < size[2]);
+
+  case mjGEOM_PLANE:
+    return plocal[2] < 0;
+
+  default:
+    return 0;
+  }
+}
 
 
 // ----------------------------- Flex interpolation ------------------------------------------------

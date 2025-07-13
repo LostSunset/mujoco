@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mujoco/experimental/usd/mjcPhysics/actuatorAPI.h>
+#include <mujoco/experimental/usd/mjcPhysics/actuator.h>
 
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/sdf/types.h>
@@ -23,313 +23,338 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 // Register the schema with the TfType system.
 TF_REGISTRY_FUNCTION(TfType) {
-  TfType::Define<MjcPhysicsActuatorAPI, TfType::Bases<UsdAPISchemaBase> >();
+  TfType::Define<MjcPhysicsActuator, TfType::Bases<UsdTyped> >();
+
+  // Register the usd prim typename as an alias under UsdSchemaBase. This
+  // enables one to call
+  // TfType::Find<UsdSchemaBase>().FindDerivedByName("MjcActuator")
+  // to find TfType<MjcPhysicsActuator>, which is how IsA queries are
+  // answered.
+  TfType::AddAlias<UsdSchemaBase, MjcPhysicsActuator>("MjcActuator");
 }
 
 /* virtual */
-MjcPhysicsActuatorAPI::~MjcPhysicsActuatorAPI() {}
+MjcPhysicsActuator::~MjcPhysicsActuator() {}
 
 /* static */
-MjcPhysicsActuatorAPI MjcPhysicsActuatorAPI::Get(const UsdStagePtr &stage,
-                                                 const SdfPath &path) {
+MjcPhysicsActuator MjcPhysicsActuator::Get(const UsdStagePtr &stage,
+                                           const SdfPath &path) {
   if (!stage) {
     TF_CODING_ERROR("Invalid stage");
-    return MjcPhysicsActuatorAPI();
+    return MjcPhysicsActuator();
   }
-  return MjcPhysicsActuatorAPI(stage->GetPrimAtPath(path));
+  return MjcPhysicsActuator(stage->GetPrimAtPath(path));
+}
+
+/* static */
+MjcPhysicsActuator MjcPhysicsActuator::Define(const UsdStagePtr &stage,
+                                              const SdfPath &path) {
+  static TfToken usdPrimTypeName("MjcActuator");
+  if (!stage) {
+    TF_CODING_ERROR("Invalid stage");
+    return MjcPhysicsActuator();
+  }
+  return MjcPhysicsActuator(stage->DefinePrim(path, usdPrimTypeName));
 }
 
 /* virtual */
-UsdSchemaKind MjcPhysicsActuatorAPI::_GetSchemaKind() const {
-  return MjcPhysicsActuatorAPI::schemaKind;
+UsdSchemaKind MjcPhysicsActuator::_GetSchemaKind() const {
+  return MjcPhysicsActuator::schemaKind;
 }
 
 /* static */
-bool MjcPhysicsActuatorAPI::CanApply(const UsdPrim &prim, std::string *whyNot) {
-  return prim.CanApplyAPI<MjcPhysicsActuatorAPI>(whyNot);
-}
-
-/* static */
-MjcPhysicsActuatorAPI MjcPhysicsActuatorAPI::Apply(const UsdPrim &prim) {
-  if (prim.ApplyAPI<MjcPhysicsActuatorAPI>()) {
-    return MjcPhysicsActuatorAPI(prim);
-  }
-  return MjcPhysicsActuatorAPI();
-}
-
-/* static */
-const TfType &MjcPhysicsActuatorAPI::_GetStaticTfType() {
-  static TfType tfType = TfType::Find<MjcPhysicsActuatorAPI>();
+const TfType &MjcPhysicsActuator::_GetStaticTfType() {
+  static TfType tfType = TfType::Find<MjcPhysicsActuator>();
   return tfType;
 }
 
 /* static */
-bool MjcPhysicsActuatorAPI::_IsTypedSchema() {
+bool MjcPhysicsActuator::_IsTypedSchema() {
   static bool isTyped = _GetStaticTfType().IsA<UsdTyped>();
   return isTyped;
 }
 
 /* virtual */
-const TfType &MjcPhysicsActuatorAPI::_GetTfType() const {
+const TfType &MjcPhysicsActuator::_GetTfType() const {
   return _GetStaticTfType();
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcCtrlLimitedAttr() const {
+UsdAttribute MjcPhysicsActuator::GetGroupAttr() const {
+  return GetPrim().GetAttribute(MjcPhysicsTokens->mjcGroup);
+}
+
+UsdAttribute MjcPhysicsActuator::CreateGroupAttr(VtValue const &defaultValue,
+                                                 bool writeSparsely) const {
+  return UsdSchemaBase::_CreateAttr(
+      MjcPhysicsTokens->mjcGroup, SdfValueTypeNames->Int,
+      /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
+}
+
+UsdAttribute MjcPhysicsActuator::GetMjcCtrlLimitedAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcCtrlLimited);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcCtrlLimitedAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcCtrlLimitedAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcCtrlLimited, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcForceLimitedAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcForceLimitedAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcForceLimited);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcForceLimitedAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcForceLimitedAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcForceLimited, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcActLimitedAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcActLimitedAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcActLimited);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcActLimitedAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcActLimitedAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcActLimited, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcCtrlRangeMinAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcCtrlRangeMinAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcCtrlRangeMin);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcCtrlRangeMinAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcCtrlRangeMinAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcCtrlRangeMin, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcCtrlRangeMaxAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcCtrlRangeMaxAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcCtrlRangeMax);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcCtrlRangeMaxAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcCtrlRangeMaxAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcCtrlRangeMax, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcForceRangeMinAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcForceRangeMinAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcForceRangeMin);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcForceRangeMinAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcForceRangeMinAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcForceRangeMin, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcForceRangeMaxAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcForceRangeMaxAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcForceRangeMax);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcForceRangeMaxAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcForceRangeMaxAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcForceRangeMax, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcActRangeMinAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcActRangeMinAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcActRangeMin);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcActRangeMinAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcActRangeMinAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcActRangeMin, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcActRangeMaxAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcActRangeMaxAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcActRangeMax);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcActRangeMaxAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcActRangeMaxAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcActRangeMax, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcLengthRangeMinAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcLengthRangeMinAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcLengthRangeMin);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcLengthRangeMinAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcLengthRangeMinAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcLengthRangeMin, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcLengthRangeMaxAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcLengthRangeMaxAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcLengthRangeMax);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcLengthRangeMaxAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcLengthRangeMaxAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcLengthRangeMax, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcGearAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcGearAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcGear);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcGearAttr(
-    VtValue const &defaultValue, bool writeSparsely) const {
+UsdAttribute MjcPhysicsActuator::CreateMjcGearAttr(VtValue const &defaultValue,
+                                                   bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcGear, SdfValueTypeNames->DoubleArray,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcCrankLengthAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcCrankLengthAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcCrankLength);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcCrankLengthAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcCrankLengthAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcCrankLength, SdfValueTypeNames->Double,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcJointInParentAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcJointInParentAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcJointInParent);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcJointInParentAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcJointInParentAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcJointInParent, SdfValueTypeNames->Bool,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcActDimAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcActDimAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcActDim);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcActDimAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcActDimAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcActDim, SdfValueTypeNames->Int,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcDynTypeAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcDynTypeAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcDynType);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcDynTypeAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcDynTypeAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcDynType, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcGainTypeAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcGainTypeAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcGainType);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcGainTypeAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcGainTypeAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcGainType, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcBiasTypeAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcBiasTypeAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcBiasType);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcBiasTypeAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcBiasTypeAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcBiasType, SdfValueTypeNames->Token,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcDynPrmAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcDynPrmAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcDynPrm);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcDynPrmAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcDynPrmAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcDynPrm, SdfValueTypeNames->DoubleArray,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcGainPrmAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcGainPrmAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcGainPrm);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcGainPrmAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcGainPrmAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcGainPrm, SdfValueTypeNames->DoubleArray,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcBiasPrmAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcBiasPrmAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcBiasPrm);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcBiasPrmAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcBiasPrmAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcBiasPrm, SdfValueTypeNames->DoubleArray,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::GetMjcActEarlyAttr() const {
+UsdAttribute MjcPhysicsActuator::GetMjcActEarlyAttr() const {
   return GetPrim().GetAttribute(MjcPhysicsTokens->mjcActEarly);
 }
 
-UsdAttribute MjcPhysicsActuatorAPI::CreateMjcActEarlyAttr(
+UsdAttribute MjcPhysicsActuator::CreateMjcActEarlyAttr(
     VtValue const &defaultValue, bool writeSparsely) const {
   return UsdSchemaBase::_CreateAttr(
       MjcPhysicsTokens->mjcActEarly, SdfValueTypeNames->Bool,
       /* custom = */ false, SdfVariabilityUniform, defaultValue, writeSparsely);
 }
 
-UsdRelationship MjcPhysicsActuatorAPI::GetMjcRefSiteRel() const {
+UsdRelationship MjcPhysicsActuator::GetMjcTargetRel() const {
+  return GetPrim().GetRelationship(MjcPhysicsTokens->mjcTarget);
+}
+
+UsdRelationship MjcPhysicsActuator::CreateMjcTargetRel() const {
+  return GetPrim().CreateRelationship(MjcPhysicsTokens->mjcTarget,
+                                      /* custom = */ false);
+}
+
+UsdRelationship MjcPhysicsActuator::GetMjcRefSiteRel() const {
   return GetPrim().GetRelationship(MjcPhysicsTokens->mjcRefSite);
 }
 
-UsdRelationship MjcPhysicsActuatorAPI::CreateMjcRefSiteRel() const {
+UsdRelationship MjcPhysicsActuator::CreateMjcRefSiteRel() const {
   return GetPrim().CreateRelationship(MjcPhysicsTokens->mjcRefSite,
                                       /* custom = */ false);
 }
 
-UsdRelationship MjcPhysicsActuatorAPI::GetMjcSliderSiteRel() const {
+UsdRelationship MjcPhysicsActuator::GetMjcSliderSiteRel() const {
   return GetPrim().GetRelationship(MjcPhysicsTokens->mjcSliderSite);
 }
 
-UsdRelationship MjcPhysicsActuatorAPI::CreateMjcSliderSiteRel() const {
+UsdRelationship MjcPhysicsActuator::CreateMjcSliderSiteRel() const {
   return GetPrim().CreateRelationship(MjcPhysicsTokens->mjcSliderSite,
                                       /* custom = */ false);
 }
@@ -346,23 +371,24 @@ static inline TfTokenVector _ConcatenateAttributeNames(
 }  // namespace
 
 /*static*/
-const TfTokenVector &MjcPhysicsActuatorAPI::GetSchemaAttributeNames(
+const TfTokenVector &MjcPhysicsActuator::GetSchemaAttributeNames(
     bool includeInherited) {
   static TfTokenVector localNames = {
-      MjcPhysicsTokens->mjcCtrlLimited,    MjcPhysicsTokens->mjcForceLimited,
-      MjcPhysicsTokens->mjcActLimited,     MjcPhysicsTokens->mjcCtrlRangeMin,
-      MjcPhysicsTokens->mjcCtrlRangeMax,   MjcPhysicsTokens->mjcForceRangeMin,
-      MjcPhysicsTokens->mjcForceRangeMax,  MjcPhysicsTokens->mjcActRangeMin,
-      MjcPhysicsTokens->mjcActRangeMax,    MjcPhysicsTokens->mjcLengthRangeMin,
-      MjcPhysicsTokens->mjcLengthRangeMax, MjcPhysicsTokens->mjcGear,
-      MjcPhysicsTokens->mjcCrankLength,    MjcPhysicsTokens->mjcJointInParent,
-      MjcPhysicsTokens->mjcActDim,         MjcPhysicsTokens->mjcDynType,
-      MjcPhysicsTokens->mjcGainType,       MjcPhysicsTokens->mjcBiasType,
-      MjcPhysicsTokens->mjcDynPrm,         MjcPhysicsTokens->mjcGainPrm,
-      MjcPhysicsTokens->mjcBiasPrm,        MjcPhysicsTokens->mjcActEarly,
+      MjcPhysicsTokens->mjcGroup,          MjcPhysicsTokens->mjcCtrlLimited,
+      MjcPhysicsTokens->mjcForceLimited,   MjcPhysicsTokens->mjcActLimited,
+      MjcPhysicsTokens->mjcCtrlRangeMin,   MjcPhysicsTokens->mjcCtrlRangeMax,
+      MjcPhysicsTokens->mjcForceRangeMin,  MjcPhysicsTokens->mjcForceRangeMax,
+      MjcPhysicsTokens->mjcActRangeMin,    MjcPhysicsTokens->mjcActRangeMax,
+      MjcPhysicsTokens->mjcLengthRangeMin, MjcPhysicsTokens->mjcLengthRangeMax,
+      MjcPhysicsTokens->mjcGear,           MjcPhysicsTokens->mjcCrankLength,
+      MjcPhysicsTokens->mjcJointInParent,  MjcPhysicsTokens->mjcActDim,
+      MjcPhysicsTokens->mjcDynType,        MjcPhysicsTokens->mjcGainType,
+      MjcPhysicsTokens->mjcBiasType,       MjcPhysicsTokens->mjcDynPrm,
+      MjcPhysicsTokens->mjcGainPrm,        MjcPhysicsTokens->mjcBiasPrm,
+      MjcPhysicsTokens->mjcActEarly,
   };
   static TfTokenVector allNames = _ConcatenateAttributeNames(
-      UsdAPISchemaBase::GetSchemaAttributeNames(true), localNames);
+      UsdTyped::GetSchemaAttributeNames(true), localNames);
 
   if (includeInherited)
     return allNames;

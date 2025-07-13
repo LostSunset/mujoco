@@ -18,7 +18,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <mujoco/experimental/usd/mjcPhysics/actuatorAPI.h>
+#include <mujoco/experimental/usd/mjcPhysics/actuator.h>
 #include <mujoco/experimental/usd/mjcPhysics/collisionAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/jointAPI.h>
 #include <mujoco/experimental/usd/mjcPhysics/meshCollisionAPI.h>
@@ -1097,10 +1097,10 @@ static constexpr char kSiteXml[] = R"(
       <worldbody>
         <site type="box" name="box_site"/>
         <body name="ball">
-          <site type="sphere" name="sphere_site"/>
-          <site type="capsule" name="capsule_site"/>
-          <site type="cylinder" name="cylinder_site"/>
-          <site type="ellipsoid" name="ellipsoid_site"/>
+          <site type="sphere" name="sphere_site" group="1"/>
+          <site type="capsule" name="capsule_site" group="2"/>
+          <site type="cylinder" name="cylinder_site" group="3"/>
+          <site type="ellipsoid" name="ellipsoid_site" group="4"/>
           <geom type="sphere" size="1 1 1"/>
         </body>
       </worldbody>
@@ -1130,6 +1130,12 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestSitePrimsAuthored) {
   EXPECT_PRIM_IS_A(stage, "/test/ball/ellipsoid_site", pxr::UsdGeomSphere);
   EXPECT_PRIM_API_APPLIED(stage, "/test/ball/ellipsoid_site",
                           pxr::MjcPhysicsSiteAPI);
+
+  ExpectAttributeEqual(stage, "/test/box_site.mjc:group", 0);
+  ExpectAttributeEqual(stage, "/test/ball/sphere_site.mjc:group", 1);
+  ExpectAttributeEqual(stage, "/test/ball/capsule_site.mjc:group", 2);
+  ExpectAttributeEqual(stage, "/test/ball/cylinder_site.mjc:group", 3);
+  ExpectAttributeEqual(stage, "/test/ball/ellipsoid_site.mjc:group", 4);
 }
 
 TEST_F(MjcfSdfFileFormatPluginTest, TestSitePrimsPurpose) {
@@ -1440,6 +1446,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsMeshCollisionAPI) {
       <mesh name="tet_exact" inertia="exact" vertex="0 0 0  1 0 0  0 1 0  0 0 1"/>
       <mesh name="tet_convex" inertia="convex" vertex="0 0 0  1 0 0  0 1 0  0 0 1"/>
       <mesh name="tet_shell" inertia="shell" vertex="0 0 0  1 0 0  0 1 0  0 0 1"/>
+      <mesh name="tet_max_vert" inertia="shell" maxhullvert="12" vertex="0 0 0  1 0 0  0 1 0  0 0 1"/>
     </asset>
     <worldbody>
       <body name="body">
@@ -1447,6 +1454,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsMeshCollisionAPI) {
         <geom name="tet_exact" type="mesh" mesh="tet_exact"/>
         <geom name="tet_convex" type="mesh" mesh="tet_convex"/>
         <geom name="tet_shell" type="mesh" mesh="tet_shell"/>
+        <geom name="tet_max_vert" type="mesh" mesh="tet_max_vert"/>
       </body>
     </worldbody>
   </mujoco>
@@ -1461,6 +1469,8 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsMeshCollisionAPI) {
                        MjcPhysicsTokens->convex);
   ExpectAttributeEqual(stage, "/test/body/tet_shell/Mesh.mjc:inertia",
                        MjcPhysicsTokens->shell);
+  ExpectAttributeEqual(stage, "/test/body/tet_max_vert/Mesh.mjc:maxhullvert",
+                       12);
 }
 
 TEST_F(MjcfSdfFileFormatPluginTest, TestMassAPIApplied) {
@@ -1521,7 +1531,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMassAPIDensity) {
   ExpectAttributeEqual(stage, "/test/body/box.physics:density", 1234.0f);
 }
 
-TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsActuatorGeneral) {
+TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsActuator) {
   static constexpr char xml[] = R"(
   <mujoco model="test">
     <worldbody>
@@ -1534,6 +1544,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsActuatorGeneral) {
     <actuator>
       <general
         name="general"
+        group="123"
         site="site"
         refsite="ref"
         ctrllimited="true"
@@ -1558,37 +1569,51 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsActuatorGeneral) {
   )";
   auto stage = OpenStageWithPhysics(xml);
 
-  EXPECT_PRIM_API_APPLIED(stage, "/test/body/site", pxr::MjcPhysicsActuatorAPI);
-  EXPECT_REL_HAS_TARGET(stage, "/test/body/site.mjc:refSite", "/test/body/ref");
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:ctrlLimited",
+  EXPECT_PRIM_VALID(stage, "/test/Actuators/general");
+  EXPECT_PRIM_IS_A(stage, "/test/Actuators/general",
+                   pxr::MjcPhysicsActuator);
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:target",
+                        "/test/body/site");
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:refSite",
+                        "/test/body/ref");
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:group", 123);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:ctrlLimited",
                        pxr::MjcPhysicsTokens->true_);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:ctrlRange:min", 0.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:ctrlRange:max", 1.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:forceLimited",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:ctrlRange:min",
+                       0.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:ctrlRange:max",
+                       1.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:forceLimited",
                        pxr::MjcPhysicsTokens->true_);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:forceRange:min", 2.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:forceRange:max", 3.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:actLimited",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:forceRange:min",
+                       2.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:forceRange:max",
+                       3.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:actLimited",
                        pxr::MjcPhysicsTokens->false_);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:actRange:min", 4.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:actRange:max", 5.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:lengthRange:min", 6.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:lengthRange:max", 7.0);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:actDim", 1);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:dynType",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:actRange:min",
+                       4.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:actRange:max",
+                       5.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:lengthRange:min",
+                       6.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:lengthRange:max",
+                       7.0);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:actDim", 1);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:dynType",
                        MjcPhysicsTokens->filter);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:gainType",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:gainType",
                        MjcPhysicsTokens->user);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:biasType",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:biasType",
                        MjcPhysicsTokens->user);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:actEarly", true);
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:gear",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:actEarly", true);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:gear",
                        pxr::VtDoubleArray{{1, 2, 3, 4, 5, 6}});
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:dynPrm",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:dynPrm",
                        pxr::VtDoubleArray{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:gainPrm",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:gainPrm",
                        pxr::VtDoubleArray{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
-  ExpectAttributeEqual(stage, "/test/body/site.mjc:biasPrm",
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:biasPrm",
                        pxr::VtDoubleArray{{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
 }
 
@@ -1613,8 +1638,11 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsJointActuator) {
   )";
   auto stage = OpenStageWithPhysics(xml);
 
-  EXPECT_PRIM_API_APPLIED(stage, "/test/axle/rod/rod_hinge",
-                          pxr::MjcPhysicsActuatorAPI);
+  EXPECT_PRIM_VALID(stage, "/test/Actuators/general");
+  EXPECT_PRIM_IS_A(stage, "/test/Actuators/general",
+                   pxr::MjcPhysicsActuator);
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:target",
+                        "/test/axle/rod/rod_hinge");
 }
 
 TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsBodyActuator) {
@@ -1635,7 +1663,11 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsBodyActuator) {
   )";
   auto stage = OpenStageWithPhysics(xml);
 
-  EXPECT_PRIM_API_APPLIED(stage, "/test/body", pxr::MjcPhysicsActuatorAPI);
+  EXPECT_PRIM_VALID(stage, "/test/Actuators/general");
+  EXPECT_PRIM_IS_A(stage, "/test/Actuators/general",
+                   pxr::MjcPhysicsActuator);
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:target",
+                        "/test/body");
 }
 
 TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsSliderCrankActuator) {
@@ -1660,11 +1692,15 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsSliderCrankActuator) {
   )";
   auto stage = OpenStageWithPhysics(xml);
 
-  EXPECT_PRIM_API_APPLIED(stage, "/test/body/crank",
-                          pxr::MjcPhysicsActuatorAPI);
-  EXPECT_REL_HAS_TARGET(stage, "/test/body/crank.mjc:sliderSite",
+  EXPECT_PRIM_VALID(stage, "/test/Actuators/general");
+  EXPECT_PRIM_IS_A(stage, "/test/Actuators/general",
+                   pxr::MjcPhysicsActuator);
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:target",
+                        "/test/body/crank");
+  EXPECT_REL_HAS_TARGET(stage, "/test/Actuators/general.mjc:sliderSite",
                         "/test/body/slider");
-  ExpectAttributeEqual(stage, "/test/body/crank.mjc:crankLength", 1.23);
+  ExpectAttributeEqual(stage, "/test/Actuators/general.mjc:crankLength",
+                       1.23);
 }
 
 TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsJointAPI) {
@@ -1674,6 +1710,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsJointAPI) {
       <body name="parent">
         <body name="child">
           <joint name="my_joint" type="hinge"
+            group="4"
             springdamper="1 2"
             solreflimit="0.1 0.2"
             solimplimit="0.3 0.4 0.5 0.6 0.7"
@@ -1701,6 +1738,7 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsJointAPI) {
   const SdfPath joint_path("/test/parent/child/my_joint");
   EXPECT_PRIM_API_APPLIED(stage, joint_path, pxr::MjcPhysicsJointAPI);
 
+  ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:group", 4);
   ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:springdamper",
                        pxr::VtArray<double>({1, 2}));
   ExpectAttributeEqual(stage, "/test/parent/child/my_joint.mjc:solreflimit",
@@ -2101,7 +2139,6 @@ TEST_F(MjcfSdfFileFormatPluginTest, TestMjcPhysicsKeyframe) {
   ExpectAttributeEqual(stage, "/test/Keyframes/Keyframe.mjc:qpos",
                        pxr::VtDoubleArray({3}), pxr::UsdTimeCode(2.0));
 }
-
 }  // namespace
 }  // namespace usd
 }  // namespace mujoco

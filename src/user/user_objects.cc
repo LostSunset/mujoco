@@ -583,12 +583,16 @@ void mjCOctree::Make(std::vector<Triangle>& elements) {
 
 
 void mjCOctree::CreateOctree(const double aamm[6]) {
+  double aabb[6] = {(aamm[0] + aamm[3]) / 2, (aamm[1] + aamm[4]) / 2, (aamm[2] + aamm[5]) / 2,
+                    (aamm[3] - aamm[0]) / 2, (aamm[4] - aamm[1]) / 2, (aamm[5] - aamm[2]) / 2};
+  double box[6] = {aabb[0] - 1.1 * aabb[3], aabb[1] - 1.1 * aabb[4], aabb[2] - 1.1 * aabb[5],
+                   aabb[0] + 1.1 * aabb[3], aabb[1] + 1.1 * aabb[4], aabb[2] + 1.1 * aabb[5]};
   std::vector<Triangle> elements;
   Make(elements);
   std::vector<Triangle*> elements_ptrs(elements.size());
   std::transform(elements.begin(), elements.end(), elements_ptrs.begin(),
                  [](Triangle& triangle) { return &triangle; });
-  MakeOctree(elements_ptrs, aamm);
+  MakeOctree(elements_ptrs, box);
 }
 
 
@@ -3532,11 +3536,7 @@ void mjCSite::Compile(void) {
     }
 
     // size[1] = length (for capsule and cylinder)
-    double vec[3] = {
-      fromto[0]-fromto[3],
-      fromto[1]-fromto[4],
-      fromto[2]-fromto[5]
-    };
+    double vec[3] = {fromto[0]-fromto[3], fromto[1]-fromto[4], fromto[2]-fromto[5]};
     size[1] = mjuu_normvec(vec, 3)/2;
     if (size[1] < mjEPS) {
       throw mjCError(this, "fromto points too close in geom");
@@ -5714,14 +5714,14 @@ void mjCTendon::SetModel(mjCModel* _model) {
 
 
 // add site as wrap object
-void mjCTendon::WrapSite(std::string name, std::string_view info) {
+void mjCTendon::WrapSite(std::string wrapname, std::string_view wrapinfo) {
   // create wrap object
   mjCWrap* wrap = new mjCWrap(model, this);
-  wrap->info = info;
+  wrap->info = wrapinfo;
 
   // set parameters, add to path
   wrap->type = mjWRAP_SITE;
-  wrap->name = name;
+  wrap->name = wrapname;
   wrap->id = (int)path.size();
   path.push_back(wrap);
 }
@@ -5729,14 +5729,14 @@ void mjCTendon::WrapSite(std::string name, std::string_view info) {
 
 
 // add geom (with side site) as wrap object
-void mjCTendon::WrapGeom(std::string name, std::string sidesite, std::string_view info) {
+void mjCTendon::WrapGeom(std::string wrapname, std::string sidesite, std::string_view wrapinfo) {
   // create wrap object
   mjCWrap* wrap = new mjCWrap(model, this);
-  wrap->info = info;
+  wrap->info = wrapinfo;
 
   // set parameters, add to path
   wrap->type = mjWRAP_SPHERE;         // replace with cylinder later if needed
-  wrap->name = name;
+  wrap->name = wrapname;
   wrap->sidesite = sidesite;
   wrap->id = (int)path.size();
   path.push_back(wrap);
@@ -5745,14 +5745,14 @@ void mjCTendon::WrapGeom(std::string name, std::string sidesite, std::string_vie
 
 
 // add joint as wrap object
-void mjCTendon::WrapJoint(std::string name, double coef, std::string_view info) {
+void mjCTendon::WrapJoint(std::string wrapname, double coef, std::string_view wrapinfo) {
   // create wrap object
   mjCWrap* wrap = new mjCWrap(model, this);
-  wrap->info = info;
+  wrap->info = wrapinfo;
 
   // set parameters, add to path
   wrap->type = mjWRAP_JOINT;
-  wrap->name = name;
+  wrap->name = wrapname;
   wrap->prm = coef;
   wrap->id = (int)path.size();
   path.push_back(wrap);
@@ -5761,10 +5761,10 @@ void mjCTendon::WrapJoint(std::string name, double coef, std::string_view info) 
 
 
 // add pulley
-void mjCTendon::WrapPulley(double divisor, std::string_view info) {
+void mjCTendon::WrapPulley(double divisor, std::string_view wrapinfo) {
   // create wrap object
   mjCWrap* wrap = new mjCWrap(model, this);
-  wrap->info = info;
+  wrap->info = wrapinfo;
 
   // set parameters, add to path
   wrap->type = mjWRAP_PULLEY;
@@ -6508,7 +6508,6 @@ mjCSensor::mjCSensor(mjCModel* _model) {
   spec_userdata_.clear();
   obj = nullptr;
   ref = nullptr;
-  refid = -1;
 
   // in case this sensor is not compiled
   CopyFromSpec();
@@ -6610,7 +6609,7 @@ void mjCSensor::ResolveReferences(const mjCModel* m) {
     ref = m->FindObject(reftype, refname_);
   }
 
-  // get objid from objtype and objname
+  // check object
   if (objtype != mjOBJ_UNKNOWN) {
     // check for missing object name
     if (objname_.empty()) {
@@ -6635,7 +6634,7 @@ void mjCSensor::ResolveReferences(const mjCModel* m) {
     throw mjCError(this, "invalid type in sensor");
   }
 
-  // get refid from reftype and refname
+  // check reference object
   if (reftype != mjOBJ_UNKNOWN) {
     // check for missing object name
     if (refname_.empty()) {
@@ -6653,9 +6652,6 @@ void mjCSensor::ResolveReferences(const mjCModel* m) {
       throw mjCError(this,
                      "reference frame object must be (x)body, geom, site or camera in sensor");
     }
-
-    // get sensorized object id
-    refid = ref->id;
   }
 
   spec_objname_ = objname_;
@@ -6942,6 +6938,19 @@ void mjCSensor::Compile(void) {
       } else {
         needstage = mjSTAGE_VEL;
       }
+      break;
+
+    case mjSENS_INSIDESITE:
+      if (objtype != mjOBJ_BODY && objtype != mjOBJ_XBODY &&
+          objtype != mjOBJ_GEOM && objtype != mjOBJ_SITE && objtype != mjOBJ_CAMERA) {
+        throw mjCError(this, "sensor must be attached to (x)body, geom, site or camera");
+      }
+      if (reftype != mjOBJ_SITE) {
+        throw mjCError(this, "sensor must be associated with a site");
+      }
+      dim = 1;
+      datatype = mjDATATYPE_REAL;
+      needstage = mjSTAGE_POS;
       break;
 
     case mjSENS_GEOMDIST:

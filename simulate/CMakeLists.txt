@@ -29,7 +29,7 @@ set(MUJOCO_DEP_VERSION_lodepng
 
 project(
   mujoco_simulate
-  VERSION 3.3.4
+  VERSION 3.3.5
   DESCRIPTION "MuJoCo simulate binaries"
   HOMEPAGE_URL "https://mujoco.org"
 )
@@ -177,7 +177,6 @@ if(SIMULATE_BUILD_EXECUTABLE)
   if (MUJOCO_WITH_USD)
     target_link_libraries(
       simulate
-      mujoco::usd
       mujoco::usd::mjcf
     )
   endif()
@@ -249,7 +248,7 @@ if(SIMULATE_BUILD_EXECUTABLE)
     )
 
     if (MUJOCO_WITH_USD)
-      target_compile_definitions(simulate PUBLIC SIMULATE_WITH_USD)
+      target_compile_definitions(simulate PUBLIC mjUSEUSD)
 
       # Add support to RPATH for the samples.
       target_add_rpath(
